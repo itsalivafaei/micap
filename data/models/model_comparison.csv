@@ -1,0 +1,7 @@
+,accuracy,precision,recall,f1,auc,training_time
+Logistic Regression,0.875,0.8958,0.875,0.8682,0.8,4.4273
+Random Forest,0.75,0.75,0.75,0.75,0.8667,1.8557
+Ensemble,0.75,0.75,0.75,0.75,0.8667,0.8734
+Gradient Boosting,0.75,0.8214,0.75,0.7083,0.7333,8.9234
+SVM,0.625,0.6562,0.625,0.631,0.8,4.7629
+Naive Bayes,0.375,0.1406,0.375,0.2045,0.5333,5.889

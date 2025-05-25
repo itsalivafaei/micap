@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def train_traditional_models(spark, sample_size=0.1):
+def train_traditional_models(spark, sample_size=1.0):
     """Train traditional ML models"""
     logger.info("Training traditional ML models...")
 
@@ -75,7 +75,7 @@ def train_traditional_models(spark, sample_size=0.1):
     return comparison_df, cv_results
 
 
-def train_deep_learning_models(spark, sample_size=0.05):
+def train_deep_learning_models(spark, sample_size=1.0):
     """Train deep learning models"""
     logger.info("Training deep learning models...")
 
@@ -161,10 +161,10 @@ def main():
 
     try:
         # Train traditional models
-        traditional_results, cv_results = train_traditional_models(spark, sample_size=0.1)
+        traditional_results, cv_results = train_traditional_models(spark, sample_size=1.0)
 
         # Train deep learning models
-        dl_results = train_deep_learning_models(spark, sample_size=0.05)
+        dl_results = train_deep_learning_models(spark, sample_size=1.0)
 
         # Generate report
         report = generate_performance_report(traditional_results, dl_results, cv_results)

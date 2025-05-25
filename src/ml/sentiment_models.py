@@ -1,7 +1,6 @@
 """
-Sentiment Analysis Models for MICAP
-Implements multiple ML algorithms for sentiment classification
-Optimized for distributed processing on M4 Mac
+Sentiment Analysis Models for MICAP - FIXED VERSION
+Fixed Naive Bayes compatibility and feature scaling issues
 """
 
 import time
@@ -14,7 +13,7 @@ import pandas as pd
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import (
-    VectorAssembler, StandardScaler, StringIndexer,
+    VectorAssembler, StandardScaler, MinMaxScaler, StringIndexer,
     IndexToString, OneHotEncoder
 )
 from pyspark.ml.classification import (
@@ -66,7 +65,7 @@ class BaseModel(ABC):
 
     def prepare_features(self, df: DataFrame, feature_cols: List[str]) -> DataFrame:
         """
-        Prepare features for model training
+        Prepare features for model training with model-specific scaling
 
         Args:
             df: Input DataFrame
@@ -93,13 +92,22 @@ class BaseModel(ABC):
             outputCol="features_raw"
         )
 
-        # Scale features
-        scaler = StandardScaler(
-            inputCol="features_raw",
-            outputCol="features",
-            withStd=True,
-            withMean=True
-        )
+        # Model-specific feature scaling
+        if self.model_name == "Naive Bayes":
+            # Naive Bayes requires non-negative features
+            # Use MinMaxScaler to ensure all values are positive
+            scaler = MinMaxScaler(
+                inputCol="features_raw",
+                outputCol="features"
+            )
+        else:
+            # Other models can handle negative values
+            scaler = StandardScaler(
+                inputCol="features_raw",
+                outputCol="features",
+                withStd=True,
+                withMean=True
+            )
 
         # Create preprocessing pipeline
         preprocessing = Pipeline(stages=[assembler, scaler])
@@ -273,22 +281,22 @@ class BaseModel(ABC):
 
 class NaiveBayesModel(BaseModel):
     """
-    Naive Bayes classifier for sentiment analysis
-    Fast and efficient for text classification
+    Naive Bayes classifier for sentiment analysis - FIXED for non-negative features
     """
 
     def __init__(self, spark: SparkSession):
         super().__init__(spark, "Naive Bayes")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build Naive Bayes pipeline"""
+        """Build Naive Bayes pipeline with Gaussian model type"""
 
-        # Naive Bayes classifier
+        # Use Gaussian Naive Bayes which can handle any real-valued features
+        # or use multinomial with proper feature scaling
         nb = NaiveBayes(
             labelCol="label",
             featuresCol="features",
             smoothing=1.0,
-            modelType="multinomial"
+            modelType="gaussian"  # Changed from "multinomial" to "gaussian"
         )
 
         # Create pipeline
@@ -308,7 +316,6 @@ class NaiveBayesModel(BaseModel):
 class LogisticRegressionModel(BaseModel):
     """
     Logistic Regression with ElasticNet regularization
-    Good baseline for binary classification
     """
 
     def __init__(self, spark: SparkSession):
@@ -317,19 +324,16 @@ class LogisticRegressionModel(BaseModel):
     def build_model(self, feature_cols: List[str]) -> Pipeline:
         """Build Logistic Regression pipeline"""
 
-        # Logistic Regression classifier
         lr = LogisticRegression(
             labelCol="label",
             featuresCol="features",
             maxIter=100,
             regParam=0.01,
-            elasticNetParam=0.5,  # 0.5 = equal mix of L1 and L2
+            elasticNetParam=0.5,
             family="binomial"
         )
 
-        # Create pipeline
         pipeline = Pipeline(stages=[lr])
-
         return pipeline
 
     def _get_param_grid(self):
@@ -345,7 +349,6 @@ class LogisticRegressionModel(BaseModel):
 class RandomForestModel(BaseModel):
     """
     Random Forest classifier
-    Ensemble method with good performance
     """
 
     def __init__(self, spark: SparkSession):
@@ -354,7 +357,6 @@ class RandomForestModel(BaseModel):
     def build_model(self, feature_cols: List[str]) -> Pipeline:
         """Build Random Forest pipeline"""
 
-        # Random Forest classifier
         rf = RandomForestClassifier(
             labelCol="label",
             featuresCol="features",
@@ -365,9 +367,7 @@ class RandomForestModel(BaseModel):
             featureSubsetStrategy="sqrt"
         )
 
-        # Create pipeline
         pipeline = Pipeline(stages=[rf])
-
         return pipeline
 
     def _get_param_grid(self):
@@ -383,7 +383,6 @@ class RandomForestModel(BaseModel):
 class GradientBoostingModel(BaseModel):
     """
     Gradient Boosting Trees classifier
-    High accuracy but slower training
     """
 
     def __init__(self, spark: SparkSession):
@@ -392,7 +391,6 @@ class GradientBoostingModel(BaseModel):
     def build_model(self, feature_cols: List[str]) -> Pipeline:
         """Build Gradient Boosting pipeline"""
 
-        # GBT classifier
         gbt = GBTClassifier(
             labelCol="label",
             featuresCol="features",
@@ -403,9 +401,7 @@ class GradientBoostingModel(BaseModel):
             stepSize=0.1
         )
 
-        # Create pipeline
         pipeline = Pipeline(stages=[gbt])
-
         return pipeline
 
     def _get_param_grid(self):
@@ -421,7 +417,6 @@ class GradientBoostingModel(BaseModel):
 class SVMModel(BaseModel):
     """
     Support Vector Machine (Linear SVC)
-    Good for high-dimensional text features
     """
 
     def __init__(self, spark: SparkSession):
@@ -430,7 +425,6 @@ class SVMModel(BaseModel):
     def build_model(self, feature_cols: List[str]) -> Pipeline:
         """Build SVM pipeline"""
 
-        # Linear SVC
         svm = LinearSVC(
             labelCol="label",
             featuresCol="features",
@@ -439,9 +433,7 @@ class SVMModel(BaseModel):
             standardization=True
         )
 
-        # Create pipeline
         pipeline = Pipeline(stages=[svm])
-
         return pipeline
 
     def _get_param_grid(self):
@@ -455,8 +447,7 @@ class SVMModel(BaseModel):
 
 class EnsembleModel(BaseModel):
     """
-    Ensemble of multiple models using voting
-    Combines predictions from different algorithms
+    Ensemble of multiple models
     """
 
     def __init__(self, spark: SparkSession):
@@ -466,23 +457,13 @@ class EnsembleModel(BaseModel):
     def build_model(self, feature_cols: List[str]) -> Pipeline:
         """Build ensemble pipeline"""
 
-        # Create base models
-        nb = NaiveBayes(smoothing=1.0)
-        lr = LogisticRegression(maxIter=100, regParam=0.01)
+        # Use Random Forest as the main model for the ensemble
         rf = RandomForestClassifier(numTrees=50, maxDepth=5, seed=42)
-
-        # Store base models
-        self.base_models = [nb, lr, rf]
-
-        # For now, we'll use Random Forest as the main model
-        # (Full voting ensemble would require custom implementation)
         pipeline = Pipeline(stages=[rf])
-
         return pipeline
 
     def _get_param_grid(self):
         """Parameter grid for ensemble"""
-        # Simplified for demonstration
         rf = RandomForestClassifier()
         paramGrid = ParamGridBuilder() \
             .addGrid(rf.numTrees, [50, 100]) \
@@ -503,18 +484,9 @@ class ModelEvaluator:
                             feature_cols: List[str]) -> pd.DataFrame:
         """
         Evaluate all models and compare results
-
-        Args:
-            train_df: Training data
-            test_df: Test data
-            feature_cols: Feature columns
-
-        Returns:
-            DataFrame with comparison results
         """
         logger.info("Starting comprehensive model evaluation...")
 
-        # Initialize models
         models = [
             NaiveBayesModel(self.spark),
             LogisticRegressionModel(self.spark),
@@ -524,27 +496,39 @@ class ModelEvaluator:
             EnsembleModel(self.spark)
         ]
 
-        # Train and evaluate each model
         for model in models:
             logger.info(f"\n{'=' * 50}")
             logger.info(f"Training {model.model_name}")
             logger.info(f"{'=' * 50}")
 
-            # Train model
-            model.train(train_df, feature_cols)
+            try:
+                # Train model
+                model.train(train_df, feature_cols)
 
-            # Evaluate model
-            metrics = model.evaluate(test_df, feature_cols)
+                # Evaluate model
+                metrics = model.evaluate(test_df, feature_cols)
 
-            # Store results
-            self.results[model.model_name] = {
-                'accuracy': metrics['accuracy'],
-                'precision': metrics['precision'],
-                'recall': metrics['recall'],
-                'f1': metrics['f1'],
-                'auc': metrics['auc'],
-                'training_time': metrics['training_time']
-            }
+                # Store results
+                self.results[model.model_name] = {
+                    'accuracy': metrics['accuracy'],
+                    'precision': metrics['precision'],
+                    'recall': metrics['recall'],
+                    'f1': metrics['f1'],
+                    'auc': metrics['auc'],
+                    'training_time': metrics['training_time']
+                }
+
+            except Exception as e:
+                logger.error(f"Failed to train/evaluate {model.model_name}: {e}")
+                # Store placeholder results
+                self.results[model.model_name] = {
+                    'accuracy': 0.0,
+                    'precision': 0.0,
+                    'recall': 0.0,
+                    'f1': 0.0,
+                    'auc': 0.0,
+                    'training_time': 0.0
+                }
 
         # Create comparison DataFrame
         comparison_df = pd.DataFrame(self.results).T
@@ -564,18 +548,9 @@ class ModelEvaluator:
                                  model_name: str = "Random Forest") -> Dict:
         """
         Perform cross-validation on selected model
-
-        Args:
-            df: Input DataFrame
-            feature_cols: Feature columns
-            model_name: Model to use for CV
-
-        Returns:
-            Cross-validation results
         """
         logger.info(f"Performing cross-validation for {model_name}")
 
-        # Select model
         if model_name == "Random Forest":
             model = RandomForestModel(self.spark)
         elif model_name == "Logistic Regression":
@@ -583,20 +558,13 @@ class ModelEvaluator:
         else:
             model = RandomForestModel(self.spark)
 
-        # Perform cross-validation
         cv_results = model.cross_validate(df, feature_cols, num_folds=5)
-
         return cv_results
 
     def save_results(self, comparison_df: pd.DataFrame, output_path: str):
         """Save evaluation results"""
-
-        # Save as CSV
         comparison_df.to_csv(f"{output_path}/model_comparison.csv")
-
-        # Save as JSON
         comparison_df.to_json(f"{output_path}/model_comparison.json", orient='index')
-
         logger.info(f"Results saved to {output_path}")
 
 

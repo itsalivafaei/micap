@@ -31,7 +31,7 @@ def benchmark_models(spark, data_sizes=[0.01, 0.05, 0.1, 0.2]):
     logger.info("Starting performance benchmarking...")
 
     # Load full dataset
-    df = spark.read.parquet("data/processed/pipeline_features")
+    df = spark.read.parquet("/Users/ali/Documents/Projects/micap/data/processed/pipeline_features")
 
     # Define features
     feature_cols = [
@@ -105,7 +105,7 @@ def benchmark_models(spark, data_sizes=[0.01, 0.05, 0.1, 0.2]):
     results_df = pd.DataFrame(results)
 
     # Save results
-    results_df.to_csv("data/models/benchmark_results.csv", index=False)
+    results_df.to_csv("/Users/ali/Documents/Projects/micap/data/models/benchmark_results.csv", index=False)
 
     return results_df
 
@@ -164,7 +164,7 @@ def visualize_benchmarks(results_df):
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('data/models/benchmark_plots.png', dpi=300)
+    plt.savefig('/Users/ali/Documents/Projects/micap/data/models/benchmark_plots.png', dpi=300)
     plt.show()
 
 

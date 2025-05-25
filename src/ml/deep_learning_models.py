@@ -20,7 +20,7 @@ from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, collect_list
 
 # Configure TensorFlow for M4 Mac
-tf.config.set_visible_devices(tf.config.list_physical_devices('GPU'))
+# tf.config.set_visible_devices(tf.config.list_physical_devices('GPU'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -99,7 +99,7 @@ class LSTMModel(DeepLearningModel):
 
         model = models.Sequential([
             layers.Embedding(self.max_words, embedding_dim,
-                             input_length=self.max_length),
+                           input_length=self.max_length),
             layers.SpatialDropout1D(0.2),
             layers.LSTM(64, dropout=0.2, recurrent_dropout=0.2),
             layers.Dense(32, activation='relu'),
@@ -176,7 +176,7 @@ class CNNModel(DeepLearningModel):
 
         model = models.Sequential([
             layers.Embedding(self.max_words, embedding_dim,
-                             input_length=self.max_length),
+                           input_length=self.max_length),
             layers.Conv1D(128, 5, activation='relu'),
             layers.GlobalMaxPooling1D(),
             layers.Dense(64, activation='relu'),
@@ -237,7 +237,7 @@ class TransformerModel(DeepLearningModel):
     """
 
     def build_model(self, embedding_dim: int = 128,
-                    num_heads: int = 4) -> models.Model:
+                   num_heads: int = 4) -> models.Model:
         """
         Build Transformer model architecture
 
@@ -329,7 +329,7 @@ class TransformerModel(DeepLearningModel):
 
 
 def evaluate_deep_learning_models(spark: SparkSession,
-                                  sample_size: float = 0.1) -> Dict:
+                                sample_size: float = 0.1) -> Dict:
     """
     Evaluate all deep learning models
 
@@ -343,8 +343,16 @@ def evaluate_deep_learning_models(spark: SparkSession,
     logger.info("Starting deep learning model evaluation...")
 
     # Load data
-    df = spark.read.parquet("data/processed/pipeline_features")
+    df = spark.read.parquet("/Users/ali/Documents/Projects/micap/data/processed/pipeline_features")
     df_sample = df.sample(sample_size)
+
+    ####
+    # df = spark.read.parquet("/Users/ali/Documents/Projects/micap/data/processed/pipeline_features")
+    print("Total rows :", df.count())
+    # df_sample = df.sample(False, 0.05, seed=42)
+    print("Sample rows:", df_sample.count())
+
+    ####
 
     # Initialize models
     lstm = LSTMModel(spark)
@@ -395,9 +403,9 @@ def evaluate_deep_learning_models(spark: SparkSession,
     }
 
     # Display results
-    logger.info("\n" + "=" * 50)
+    logger.info("\n" + "="*50)
     logger.info("Deep Learning Model Results")
-    logger.info("=" * 50)
+    logger.info("="*50)
     for model_name, metrics in results.items():
         logger.info(f"\n{model_name}:")
         logger.info(f"  Accuracy: {metrics['accuracy']:.4f}")
@@ -411,5 +419,5 @@ if __name__ == "__main__":
     from config.spark_config import create_spark_session
 
     spark = create_spark_session("DeepLearning")
-    results = evaluate_deep_learning_models(spark, sample_size=0.05)
+    results = evaluate_deep_learning_models(spark, sample_size=1.0)
     spark.stop()
