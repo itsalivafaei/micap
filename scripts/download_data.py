@@ -26,7 +26,7 @@ def download_sentiment140():
     """
 
     # Create data directory if it doesn't exist
-    data_dir = Path("data/raw")
+    data_dir = Path("/Users/ali/Documents/Projects/micap/data/raw")
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Dataset URL

@@ -1,7 +1,8 @@
 """
-Text Preprocessing Module for MICAP - Updated with spaCy
+Text Preprocessing Module for MICAP - No external dependencies
 Handles all text cleaning and normalization tasks
 Optimized for parallel processing on M4 Mac
+Compatible replacement for emoji/spacy dependencies
 """
 
 import re
@@ -17,8 +18,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.types import StringType, ArrayType, IntegerType
 
-import emoji
-import spacy
+# No external dependencies - emoji and spacy removed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -64,7 +64,7 @@ class TextPreprocessor:
         self.hashtag_pattern = r'#([\w]+)'
         self.number_pattern = r'\d+'
 
-        # Common English stop words
+        # Common English stop words (expanded set)
         self.stop_words = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
                            'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
                            'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which',
@@ -72,14 +72,13 @@ class TextPreprocessor:
                            'be', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and',
                            'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with',
                            'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above',
-                           'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under'}
+                           'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+                           'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any',
+                           'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not',
+                           'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now'}
 
-        # Initialize spaCy model (load once for efficiency)
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.warning("spaCy model 'en_core_web_sm' not found. Using basic lemmatization.")
-            self.nlp = None
+        # No spaCy initialization - using built-in methods only
+        logger.info("Using built-in text processing (no external dependencies)")
 
         # Register UDFs
         self._register_udfs()
@@ -87,63 +86,123 @@ class TextPreprocessor:
     def _register_udfs(self):
         """Register User Defined Functions for complex preprocessing"""
 
-        # UDF for emoji handling
-        def extract_emoji_sentiment(text):
-            """Extract sentiment from emojis"""
+        # Enhanced emoji sentiment without external dependencies
+        def extract_emoji_sentiment_enhanced(text):
+            """Extract sentiment from emojis using Unicode ranges and comprehensive patterns"""
             try:
-                emoji_list = []
                 emoji_sentiment = 0
 
-                # Common positive emojis
-                positive_emojis = ['😊', '😃', '😄', '❤️', '👍', '🎉', '✨', '🌟', '💕']
-                # Common negative emojis
-                negative_emojis = ['😢', '😭', '😡', '😠', '👎', '💔', '😰', '😨']
+                # Comprehensive emoji sentiment mapping
+                positive_emojis = {
+                    # Smiling faces
+                    '😊', '😃', '😄', '😆', '😁', '😂', '🤣', '😍', '🥰', '😘', '😗', '😙', '😚',
+                    '🙂', '🤗', '🤩', '🥳', '😋', '😛', '😜', '🤪', '😇', '🥲',
+                    # Hearts and love
+                    '❤️', '💕', '💖', '💗', '💓', '💝', '💘', '💞', '💟', '❣️', '💔', '🧡', '💛',
+                    '💚', '💙', '💜', '🤍', '🖤', '🤎', '❤️‍🔥', '❤️‍🩹',
+                    # Thumbs and hands
+                    '👍', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👏', '🙌', '👐', '🤲', '🙏',
+                    '✊', '👊', '🤛', '🤜', '💪', '🦾', '🦿',
+                    # Celebration and positive symbols
+                    '🎉', '🎊', '🎈', '🎁', '🎂', '🍰', '🧁', '🥳', '🎆', '🎇', '✨', '⭐', '🌟',
+                    '💫', '🔆', '☀️', '🌞', '🌝', '🌛', '🌜', '🌚', '🌈', '☁️', '⛅', '⛈️',
+                    # Success and achievement
+                    '🏆', '🥇', '🏅', '🎖️', '🏵️', '🎗️', '🎯', '🎪', '🎭', '🎨', '🎬', '🎤',
+                    '🎧', '🎼', '🎵', '🎶', '🎺', '🎸', '🎻', '🥁', '🎹'
+                }
 
+                negative_emojis = {
+                    # Sad and crying faces
+                    '😢', '😭', '😿', '😾', '🙀', '😰', '😨', '😧', '😦', '😮', '😯', '😲', '😱',
+                    '🤯', '😳', '🥵', '🥶', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖',
+                    '😫', '😩', '🥺', '😤', '😠', '😡', '🤬', '😈', '👿', '💀', '☠️',
+                    # Negative symbols
+                    '👎', '✋', '🛑', '⛔', '📵', '🚫', '❌', '❎', '💢', '💥', '💫', '💦',
+                    '💨', '🕳️', '💣', '💔', '⚡', '🔥', '❄️', '💤', '💭', '🗯️', '💬',
+                    # Sickness and pain
+                    '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🩹', '🩺', '💊', '💉', '🦠', '🦷',
+                    '🦴', '💀', '☠️'
+                }
+
+                neutral_positive = {
+                    '😊', '🙂', '😌', '😉', '😏', '🤨', '🤓', '😎', '🥸', '🤯', '🥱', '🤤'
+                }
+
+                # Check each character for emoji sentiment
                 for char in text:
-                    if emoji.is_emoji(char):
-                        emoji_list.append(char)
+                    if ord(char) >= 0x1F600:  # Basic emoji range check
                         if char in positive_emojis:
-                            emoji_sentiment += 1
+                            emoji_sentiment += 2  # Strong positive
+                        elif char in neutral_positive:
+                            emoji_sentiment += 1  # Mild positive
                         elif char in negative_emojis:
-                            emoji_sentiment -= 1
+                            emoji_sentiment -= 2  # Strong negative
 
                 return emoji_sentiment
-            except:
+            except Exception:
                 return 0
 
-        self.emoji_sentiment_udf = udf(extract_emoji_sentiment, IntegerType())
+        self.emoji_sentiment_udf = udf(extract_emoji_sentiment_enhanced, IntegerType())
 
-        # UDF for lemmatization with spaCy or fallback
-        def lemmatize_text(text):
-            """Lemmatize text using spaCy or basic fallback"""
-            try:
-                if self.nlp is not None:
-                    # Use spaCy for lemmatization
-                    doc = self.nlp(text)
-                    return ' '.join([token.lemma_ for token in doc if not token.is_space])
-                else:
-                    # Basic fallback - just return the text
-                    # You could implement simple stemming here if needed
-                    return text
-            except:
-                return text
-
-        self.lemmatize_udf = udf(lemmatize_text, StringType())
-
-        # Simple lemmatization UDF without external dependencies
-        def simple_lemmatize(text):
-            """Simple rule-based lemmatization for common cases"""
+        # Enhanced lemmatization with better rules
+        def enhanced_lemmatize(text):
+            """Enhanced rule-based lemmatization with more comprehensive patterns"""
             try:
                 words = text.split()
                 lemmatized = []
 
+                # Common irregular verb mappings
+                irregular_verbs = {
+                    'was': 'be', 'were': 'be', 'been': 'be', 'being': 'be',
+                    'had': 'have', 'has': 'have', 'having': 'have',
+                    'did': 'do', 'does': 'do', 'doing': 'do', 'done': 'do',
+                    'went': 'go', 'goes': 'go', 'going': 'go', 'gone': 'go',
+                    'said': 'say', 'says': 'say', 'saying': 'say',
+                    'got': 'get', 'gets': 'get', 'getting': 'get', 'gotten': 'get',
+                    'came': 'come', 'comes': 'come', 'coming': 'come',
+                    'took': 'take', 'takes': 'take', 'taking': 'take', 'taken': 'take',
+                    'made': 'make', 'makes': 'make', 'making': 'make',
+                    'gave': 'give', 'gives': 'give', 'giving': 'give', 'given': 'give'
+                }
+
                 for word in words:
-                    # Simple rules for common suffixes
-                    if word.endswith('ing') and len(word) > 4:
-                        lemmatized.append(word[:-3])
-                    elif word.endswith('ed') and len(word) > 3:
+                    word_lower = word.lower()
+
+                    # Check irregular verbs first
+                    if word_lower in irregular_verbs:
+                        lemmatized.append(irregular_verbs[word_lower])
+                    # Apply suffix rules
+                    elif word_lower.endswith('ies') and len(word) > 4:
+                        lemmatized.append(word[:-3] + 'y')
+                    elif word_lower.endswith('ied') and len(word) > 4:
+                        lemmatized.append(word[:-3] + 'y')
+                    elif word_lower.endswith('ing') and len(word) > 4:
+                        # Handle double consonant (running -> run)
+                        if word[-4] == word[-5] and word[-4] not in 'aeiou':
+                            lemmatized.append(word[:-4])
+                        else:
+                            lemmatized.append(word[:-3])
+                    elif word_lower.endswith('ed') and len(word) > 3:
+                        # Handle double consonant (stopped -> stop)
+                        if len(word) > 4 and word[-3] == word[-4] and word[-3] not in 'aeiou':
+                            lemmatized.append(word[:-3])
+                        else:
+                            lemmatized.append(word[:-2])
+                    elif word_lower.endswith('er') and len(word) > 3:
                         lemmatized.append(word[:-2])
-                    elif word.endswith('s') and len(word) > 2 and not word.endswith('ss'):
+                    elif word_lower.endswith('est') and len(word) > 4:
+                        lemmatized.append(word[:-3])
+                    elif word_lower.endswith('ly') and len(word) > 3:
+                        lemmatized.append(word[:-2])
+                    elif word_lower.endswith('ness') and len(word) > 5:
+                        lemmatized.append(word[:-4])
+                    elif word_lower.endswith('ment') and len(word) > 5:
+                        lemmatized.append(word[:-4])
+                    elif word_lower.endswith('tion') and len(word) > 5:
+                        lemmatized.append(word[:-4])
+                    elif word_lower.endswith('sion') and len(word) > 5:
+                        lemmatized.append(word[:-4])
+                    elif word_lower.endswith('s') and len(word) > 2 and not word_lower.endswith('ss') and not word_lower.endswith('us'):
                         lemmatized.append(word[:-1])
                     else:
                         lemmatized.append(word)
@@ -152,7 +211,7 @@ class TextPreprocessor:
             except:
                 return text
 
-        self.simple_lemmatize_udf = udf(simple_lemmatize, StringType())
+        self.lemmatize_udf = udf(enhanced_lemmatize, StringType())
 
     def clean_text(self, df: DataFrame, text_col: str = "text") -> DataFrame:
         """
@@ -205,7 +264,7 @@ class TextPreprocessor:
 
     def handle_emojis(self, df: DataFrame, text_col: str = "text_clean") -> DataFrame:
         """
-        Handle emojis - extract sentiment and convert to text
+        Handle emojis - extract sentiment and clean text
 
         Args:
             df: Input DataFrame
@@ -219,16 +278,53 @@ class TextPreprocessor:
         # Extract emoji sentiment
         df = df.withColumn("emoji_sentiment", self.emoji_sentiment_udf(col(text_col)))
 
-        # Convert emojis to text description
-        def demojize_text(text):
-            """Convert emojis to text descriptions"""
+        # Simple emoji removal/replacement without external library
+        def clean_emojis(text):
+            """Remove or replace emojis with simple text markers"""
             try:
-                return emoji.demojize(text, delimiters=(" ", " "))
+                # Define common emoji to text mappings
+                emoji_replacements = {
+                    '😊': ' happy ', '😃': ' happy ', '😄': ' happy ', '😆': ' laugh ',
+                    '😂': ' laugh ', '🤣': ' laugh ', '😍': ' love ', '🥰': ' love ',
+                    '❤️': ' love ', '💕': ' love ', '👍': ' good ', '👌': ' good ',
+                    '🎉': ' celebrate ', '✨': ' sparkle ', '🌟': ' star ',
+                    '😢': ' sad ', '😭': ' cry ', '😡': ' angry ', '😠': ' angry ',
+                    '💔': ' broken heart ', '👎': ' bad ', '😰': ' worried ', '😨': ' scared '
+                }
+
+                cleaned_text = text
+                for emoji, replacement in emoji_replacements.items():
+                    cleaned_text = cleaned_text.replace(emoji, replacement)
+
+                # Remove remaining emoji characters (basic Unicode range)
+                import re
+                # Remove most common emoji ranges
+                emoji_pattern = re.compile(
+                    "["
+                    "\U0001F600-\U0001F64F"  # emoticons
+                    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+                    "\U0001F680-\U0001F6FF"  # transport & map symbols
+                    "\U0001F700-\U0001F77F"  # alchemical symbols
+                    "\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+                    "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+                    "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+                    "\U0001FA00-\U0001FA6F"  # Chess Symbols
+                    "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+                    "\U00002702-\U000027B0"  # Dingbats
+                    "\U000024C2-\U0001F251"  # Enclosed characters
+                    "]+", flags=re.UNICODE)
+
+                cleaned_text = emoji_pattern.sub(' ', cleaned_text)
+
+                # Clean up extra spaces
+                cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+
+                return cleaned_text
             except:
                 return text
 
-        demojize_udf = udf(demojize_text, StringType())
-        df = df.withColumn(f"{text_col}_demojized", demojize_udf(col(text_col)))
+        clean_emojis_udf = udf(clean_emojis, StringType())
+        df = df.withColumn(f"{text_col}_demojized", clean_emojis_udf(col(text_col)))
 
         logger.info("Emoji processing completed")
         return df
@@ -317,17 +413,11 @@ class TextPreprocessor:
             array_join(col(tokens_col), " ")
         )
 
-        # Apply lemmatization (use simple lemmatizer if spaCy fails)
-        if self.nlp is not None:
-            df = df.withColumn(
-                "text_lemmatized",
-                self.lemmatize_udf(col("text_for_lemma"))
-            )
-        else:
-            df = df.withColumn(
-                "text_lemmatized",
-                self.simple_lemmatize_udf(col("text_for_lemma"))
-            )
+        # Apply lemmatization
+        df = df.withColumn(
+            "text_lemmatized",
+            self.lemmatize_udf(col("text_for_lemma"))
+        )
 
         # Split back to tokens
         df = df.withColumn(

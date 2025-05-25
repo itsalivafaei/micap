@@ -8,7 +8,6 @@ import sys
 import time
 import logging
 from pathlib import Path
-import emoji
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
