@@ -16,19 +16,12 @@ metastore_db/
 derby.log
 
 # Data
-/data/
+#/data/
 data/raw/*
-data/processed/*
+#data/processed/*
 #!data/raw/.gitkeep
 #!data/processed/.gitkeep
-/scripts/data/
-/scripts/data/*
-scripts/data/*
-scripts/data/raw/*
-/src/spark/data/
-/src/spark/data/*
-src/spark/data/*
-src/spark/data/processed/*
+
 
 # Models
 *.pkl
