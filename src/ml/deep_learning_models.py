@@ -1,0 +1,415 @@
+"""
+Deep Learning Models for Sentiment Analysis
+Implements LSTM and CNN models using TensorFlow
+Optimized for M4 Mac with Metal acceleration
+"""
+
+import os
+import numpy as np
+import pandas as pd
+import logging
+from typing import Dict, List, Tuple
+
+import tensorflow as tf
+from tensorflow.keras import layers, models, callbacks
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.model_selection import train_test_split
+
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import col, collect_list
+
+# Configure TensorFlow for M4 Mac
+tf.config.set_visible_devices(tf.config.list_physical_devices('GPU'))
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class DeepLearningModel:
+    """
+    Base class for deep learning models
+    """
+
+    def __init__(self, spark: SparkSession, max_words: int = 10000,
+                 max_length: int = 100):
+        """
+        Initialize deep learning model
+
+        Args:
+            spark: SparkSession
+            max_words: Maximum vocabulary size
+            max_length: Maximum sequence length
+        """
+        self.spark = spark
+        self.max_words = max_words
+        self.max_length = max_length
+        self.tokenizer = Tokenizer(num_words=max_words)
+        self.model = None
+        self.history = None
+
+    def prepare_text_data(self, df: DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Prepare text data for deep learning
+
+        Args:
+            df: Spark DataFrame with text and sentiment
+
+        Returns:
+            Tuple of (X, y) arrays
+        """
+        logger.info("Preparing text data for deep learning...")
+
+        # Convert to Pandas for text processing
+        pdf = df.select("text", "sentiment").toPandas()
+
+        # Fit tokenizer on texts
+        self.tokenizer.fit_on_texts(pdf['text'].values)
+
+        # Convert texts to sequences
+        sequences = self.tokenizer.texts_to_sequences(pdf['text'].values)
+
+        # Pad sequences
+        X = pad_sequences(sequences, maxlen=self.max_length)
+        y = pdf['sentiment'].values
+
+        logger.info(f"Prepared {len(X)} samples")
+        logger.info(f"Vocabulary size: {len(self.tokenizer.word_index)}")
+
+        return X, y
+
+
+class LSTMModel(DeepLearningModel):
+    """
+    LSTM model for sentiment analysis
+    """
+
+    def build_model(self, embedding_dim: int = 128) -> models.Model:
+        """
+        Build LSTM model architecture
+
+        Args:
+            embedding_dim: Dimension of word embeddings
+
+        Returns:
+            Compiled Keras model
+        """
+        logger.info("Building LSTM model...")
+
+        model = models.Sequential([
+            layers.Embedding(self.max_words, embedding_dim,
+                             input_length=self.max_length),
+            layers.SpatialDropout1D(0.2),
+            layers.LSTM(64, dropout=0.2, recurrent_dropout=0.2),
+            layers.Dense(32, activation='relu'),
+            layers.Dropout(0.5),
+            layers.Dense(1, activation='sigmoid')
+        ])
+
+        # Compile with M4 optimized settings
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+            loss='binary_crossentropy',
+            metrics=['accuracy', tf.keras.metrics.AUC()]
+        )
+
+        self.model = model
+        return model
+
+    def train(self, X: np.ndarray, y: np.ndarray,
+              validation_split: float = 0.2,
+              epochs: int = 10, batch_size: int = 32) -> Dict:
+        """
+        Train LSTM model
+
+        Args:
+            X: Input sequences
+            y: Labels
+            validation_split: Validation split ratio
+            epochs: Number of epochs
+            batch_size: Batch size
+
+        Returns:
+            Training history
+        """
+        logger.info("Training LSTM model...")
+
+        # Define callbacks
+        early_stop = callbacks.EarlyStopping(
+            monitor='val_loss', patience=3, restore_best_weights=True
+        )
+
+        reduce_lr = callbacks.ReduceLROnPlateau(
+            monitor='val_loss', factor=0.5, patience=2, min_lr=0.00001
+        )
+
+        # Train model
+        self.history = self.model.fit(
+            X, y,
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_split=validation_split,
+            callbacks=[early_stop, reduce_lr],
+            verbose=1
+        )
+
+        return self.history.history
+
+
+class CNNModel(DeepLearningModel):
+    """
+    CNN model for sentiment analysis
+    """
+
+    def build_model(self, embedding_dim: int = 128) -> models.Model:
+        """
+        Build CNN model architecture
+
+        Args:
+            embedding_dim: Dimension of word embeddings
+
+        Returns:
+            Compiled Keras model
+        """
+        logger.info("Building CNN model...")
+
+        model = models.Sequential([
+            layers.Embedding(self.max_words, embedding_dim,
+                             input_length=self.max_length),
+            layers.Conv1D(128, 5, activation='relu'),
+            layers.GlobalMaxPooling1D(),
+            layers.Dense(64, activation='relu'),
+            layers.Dropout(0.5),
+            layers.Dense(1, activation='sigmoid')
+        ])
+
+        # Compile model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+            loss='binary_crossentropy',
+            metrics=['accuracy', tf.keras.metrics.AUC()]
+        )
+
+        self.model = model
+        return model
+
+    def train(self, X: np.ndarray, y: np.ndarray,
+              validation_split: float = 0.2,
+              epochs: int = 10, batch_size: int = 32) -> Dict:
+        """
+        Train CNN model
+
+        Args:
+            X: Input sequences
+            y: Labels
+            validation_split: Validation split ratio
+            epochs: Number of epochs
+            batch_size: Batch size
+
+        Returns:
+            Training history
+        """
+        logger.info("Training CNN model...")
+
+        # Define callbacks
+        early_stop = callbacks.EarlyStopping(
+            monitor='val_loss', patience=3, restore_best_weights=True
+        )
+
+        # Train model
+        self.history = self.model.fit(
+            X, y,
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_split=validation_split,
+            callbacks=[early_stop],
+            verbose=1
+        )
+
+        return self.history.history
+
+
+class TransformerModel(DeepLearningModel):
+    """
+    Simplified Transformer model for sentiment analysis
+    Using multi-head attention
+    """
+
+    def build_model(self, embedding_dim: int = 128,
+                    num_heads: int = 4) -> models.Model:
+        """
+        Build Transformer model architecture
+
+        Args:
+            embedding_dim: Dimension of word embeddings
+            num_heads: Number of attention heads
+
+        Returns:
+            Compiled Keras model
+        """
+        logger.info("Building Transformer model...")
+
+        # Input layer
+        inputs = layers.Input(shape=(self.max_length,))
+
+        # Embedding layer
+        embedding = layers.Embedding(self.max_words, embedding_dim)(inputs)
+
+        # Multi-head attention
+        attention = layers.MultiHeadAttention(
+            num_heads=num_heads, key_dim=embedding_dim
+        )(embedding, embedding)
+
+        # Add & Norm
+        attention = layers.LayerNormalization()(attention + embedding)
+
+        # Feed forward network
+        ff = layers.Dense(256, activation='relu')(attention)
+        ff = layers.Dense(embedding_dim)(ff)
+
+        # Add & Norm
+        ff = layers.LayerNormalization()(ff + attention)
+
+        # Global pooling
+        pooled = layers.GlobalAveragePooling1D()(ff)
+
+        # Output layers
+        dense = layers.Dense(64, activation='relu')(pooled)
+        dense = layers.Dropout(0.5)(dense)
+        outputs = layers.Dense(1, activation='sigmoid')(dense)
+
+        # Build model
+        model = models.Model(inputs=inputs, outputs=outputs)
+
+        # Compile model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+            loss='binary_crossentropy',
+            metrics=['accuracy', tf.keras.metrics.AUC()]
+        )
+
+        self.model = model
+        return model
+
+    def train(self, X: np.ndarray, y: np.ndarray,
+              validation_split: float = 0.2,
+              epochs: int = 10, batch_size: int = 32) -> Dict:
+        """
+        Train Transformer model
+
+        Args:
+            X: Input sequences
+            y: Labels
+            validation_split: Validation split ratio
+            epochs: Number of epochs
+            batch_size: Batch size
+
+        Returns:
+            Training history
+        """
+        logger.info("Training Transformer model...")
+
+        # Define callbacks
+        early_stop = callbacks.EarlyStopping(
+            monitor='val_loss', patience=3, restore_best_weights=True
+        )
+
+        # Train model
+        self.history = self.model.fit(
+            X, y,
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_split=validation_split,
+            callbacks=[early_stop],
+            verbose=1
+        )
+
+        return self.history.history
+
+
+def evaluate_deep_learning_models(spark: SparkSession,
+                                  sample_size: float = 0.1) -> Dict:
+    """
+    Evaluate all deep learning models
+
+    Args:
+        spark: SparkSession
+        sample_size: Fraction of data to use
+
+    Returns:
+        Evaluation results
+    """
+    logger.info("Starting deep learning model evaluation...")
+
+    # Load data
+    df = spark.read.parquet("data/processed/pipeline_features")
+    df_sample = df.sample(sample_size)
+
+    # Initialize models
+    lstm = LSTMModel(spark)
+    cnn = CNNModel(spark)
+    transformer = TransformerModel(spark)
+
+    # Prepare data
+    X, y = lstm.prepare_text_data(df_sample)
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    results = {}
+
+    # Train and evaluate LSTM
+    logger.info("\nTraining LSTM model...")
+    lstm.build_model()
+    lstm_history = lstm.train(X_train, y_train, epochs=5)
+    lstm_eval = lstm.model.evaluate(X_test, y_test, verbose=0)
+    results['LSTM'] = {
+        'loss': lstm_eval[0],
+        'accuracy': lstm_eval[1],
+        'auc': lstm_eval[2]
+    }
+
+    # Train and evaluate CNN
+    logger.info("\nTraining CNN model...")
+    cnn.build_model()
+    cnn_history = cnn.train(X_train, y_train, epochs=5)
+    cnn_eval = cnn.model.evaluate(X_test, y_test, verbose=0)
+    results['CNN'] = {
+        'loss': cnn_eval[0],
+        'accuracy': cnn_eval[1],
+        'auc': cnn_eval[2]
+    }
+
+    # Train and evaluate Transformer
+    logger.info("\nTraining Transformer model...")
+    transformer.build_model()
+    transformer_history = transformer.train(X_train, y_train, epochs=5)
+    transformer_eval = transformer.model.evaluate(X_test, y_test, verbose=0)
+    results['Transformer'] = {
+        'loss': transformer_eval[0],
+        'accuracy': transformer_eval[1],
+        'auc': transformer_eval[2]
+    }
+
+    # Display results
+    logger.info("\n" + "=" * 50)
+    logger.info("Deep Learning Model Results")
+    logger.info("=" * 50)
+    for model_name, metrics in results.items():
+        logger.info(f"\n{model_name}:")
+        logger.info(f"  Accuracy: {metrics['accuracy']:.4f}")
+        logger.info(f"  AUC: {metrics['auc']:.4f}")
+        logger.info(f"  Loss: {metrics['loss']:.4f}")
+
+    return results
+
+
+if __name__ == "__main__":
+    from config.spark_config import create_spark_session
+
+    spark = create_spark_session("DeepLearning")
+    results = evaluate_deep_learning_models(spark, sample_size=0.05)
+    spark.stop()
