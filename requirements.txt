@@ -1,6 +1,6 @@
 # Core dependencies for M4 Mac
 pyspark~=4.0.0
-numpy==1.24.3
+numpy==1.26.4
 pandas~=2.2.3
 scikit-learn==1.5.0
 nltk==3.9.1

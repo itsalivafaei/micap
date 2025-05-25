@@ -1,12 +1,12 @@
 """
-Feature Engineering Module for MICAP
+Feature Engineering Module for MICAP - Fixed for small datasets
 Creates ML-ready features from preprocessed text data
-Optimized for M4 Mac local processing
+Optimized for M4 Mac local processing with small sample handling
 """
 
 import logging
+import math  # Use built-in math instead of numpy
 from typing import List, Dict, Optional, Tuple
-import numpy as np
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql.functions import (
     col, count, sum as spark_sum, mean, stddev,
@@ -74,7 +74,7 @@ class FeatureEngineer:
         # Feature configuration
         self.tfidf_features = 1000  # Number of TF-IDF features
         self.word2vec_size = 100  # Word2Vec embedding size
-        self.min_word_count = 5  # Minimum word frequency
+        self.min_word_count = 2  # Reduced from 5 to handle small datasets
 
     def create_tfidf_features(self, df: DataFrame,
                               text_col: str = "tokens_lemmatized",
@@ -92,6 +92,13 @@ class FeatureEngineer:
         """
         logger.info(f"Creating TF-IDF features with {num_features} dimensions...")
 
+        # Check if we have enough data
+        row_count = df.count()
+        logger.info(f"Dataset has {row_count} rows")
+
+        # Adjust minDocFreq based on dataset size
+        min_doc_freq = max(1, min(2, row_count // 5))  # At least 1, max 2 for small datasets
+
         # Configure TF-IDF pipeline
         hashingTF = HashingTF(
             inputCol=text_col,
@@ -102,7 +109,7 @@ class FeatureEngineer:
         idf = IDF(
             inputCol="raw_features",
             outputCol="tfidf_features",
-            minDocFreq=5  # Ignore terms that appear in less than 5 documents
+            minDocFreq=min_doc_freq  # Adjusted for small datasets
         )
 
         # Build pipeline
@@ -145,7 +152,7 @@ class FeatureEngineer:
                                  tokens_col: str = "tokens_lemmatized",
                                  vector_size: int = 100) -> DataFrame:
         """
-        Generate Word2Vec embeddings
+        Generate Word2Vec embeddings with small dataset handling
 
         Args:
             df: Input DataFrame
@@ -157,24 +164,63 @@ class FeatureEngineer:
         """
         logger.info(f"Generating Word2Vec embeddings with size {vector_size}...")
 
-        # Configure Word2Vec
-        word2vec = Word2Vec(
-            vectorSize=vector_size,
-            minCount=self.min_word_count,
-            inputCol=tokens_col,
-            outputCol="word2vec_features",
-            windowSize=5,
-            maxIter=10,
-            seed=42
-        )
+        # Check dataset size and vocabulary
+        row_count = df.count()
+        logger.info(f"Dataset has {row_count} rows")
 
-        # Fit and transform
-        model = word2vec.fit(df)
-        df_w2v = model.transform(df)
+        # Count unique words to estimate vocabulary size
+        all_tokens = df.select(explode(col(tokens_col)).alias("word"))
+        unique_word_count = all_tokens.distinct().count()
+        logger.info(f"Estimated vocabulary size: {unique_word_count} unique words")
 
-        # Also save the word vectors for later use
-        word_vectors = model.getVectors()
-        logger.info(f"Learned vectors for {word_vectors.count()} words")
+        # Adjust minCount based on dataset size
+        if row_count < 10:
+            adjusted_min_count = 1  # Very small datasets
+        elif row_count < 100:
+            adjusted_min_count = 2  # Small datasets
+        else:
+            adjusted_min_count = self.min_word_count  # Normal datasets
+
+        logger.info(f"Using minCount = {adjusted_min_count} for Word2Vec")
+
+        # Check if we have any words that meet the frequency requirement
+        word_freq = all_tokens.groupBy("word").count()
+        qualifying_words = word_freq.filter(col("count") >= adjusted_min_count).count()
+
+        if qualifying_words == 0:
+            logger.warning(f"No words meet minCount={adjusted_min_count} requirement. Creating dummy embeddings.")
+            # Create dummy zero embeddings for very small datasets
+            dummy_vector = [0.0] * vector_size
+            df_w2v = df.withColumn("word2vec_features",
+                                   lit(dummy_vector).cast(ArrayType(DoubleType())))
+        else:
+            logger.info(f"{qualifying_words} words qualify for Word2Vec training")
+
+            # Configure Word2Vec
+            word2vec = Word2Vec(
+                vectorSize=vector_size,
+                minCount=adjusted_min_count,
+                inputCol=tokens_col,
+                outputCol="word2vec_features",
+                windowSize=min(5, max(2, row_count // 2)),  # Adjust window size for small datasets
+                maxIter=max(1, min(10, row_count)),  # Adjust iterations
+                seed=42
+            )
+
+            try:
+                # Fit and transform
+                model = word2vec.fit(df)
+                df_w2v = model.transform(df)
+
+                # Also save the word vectors for later use
+                word_vectors = model.getVectors()
+                logger.info(f"Learned vectors for {word_vectors.count()} words")
+            except Exception as e:
+                logger.warning(f"Word2Vec training failed: {e}. Using dummy embeddings.")
+                # Fallback to dummy embeddings
+                dummy_vector = [0.0] * vector_size
+                df_w2v = df.withColumn("word2vec_features",
+                                       lit(dummy_vector).cast(ArrayType(DoubleType())))
 
         logger.info("Word2Vec generation completed")
         return df_w2v
@@ -193,24 +239,7 @@ class FeatureEngineer:
         """
         logger.info("Extracting sentiment lexicon features...")
 
-        # Define UDF for VADER sentiment
-        # def get_vader_scores(text):
-        #     """Get VADER sentiment scores"""
-        #     try:
-        #         scores = self.vader.polarity_scores(text)
-        #         return [
-        #             float(scores['compound']),
-        #             float(scores['pos']),
-        #             float(scores['neg']),
-        #             float(scores['neu'])
-        #         ]
-        #     except:
-        #         return [0.0, 0.0, 0.0, 0.0]
-
-        # vader_udf = udf(get_vader_scores, ArrayType(DoubleType()))
-
         # Apply VADER
-        # df = df.withColumn("vader_scores", vader_udf(col(text_col)))
         df = df.withColumn("vader_scores", VADER_UDF(col(text_col)))
 
         # Extract individual scores
@@ -235,16 +264,28 @@ class FeatureEngineer:
         """
         logger.info("Extracting temporal features...")
 
-        df = df.withColumn("hour", hour(col("timestamp")))
+        # Check if timestamp column exists
+        if "timestamp" not in df.columns:
+            logger.warning("No timestamp column found. Skipping temporal features.")
+            # Add dummy temporal features
+            df = df.withColumn("hour_sin", lit(0.0)) \
+                .withColumn("hour_cos", lit(1.0)) \
+                .withColumn("is_weekend", lit(0)) \
+                .withColumn("time_of_day", lit("unknown"))
+            return df
 
-        # Hour of day features (already have hour column)
+        # Extract hour if not already present
+        if "hour" not in df.columns:
+            df = df.withColumn("hour", hour(col("timestamp")))
+
+        # Hour of day features (cyclical encoding)
         df = df.withColumn(
             "hour_sin",
-            sin(lit(2 * np.pi) * col("hour") / lit(24))
+            sin(lit(2 * math.pi) * col("hour") / lit(24))
         )
         df = df.withColumn(
             "hour_cos",
-            cos(lit(2 * np.pi) * col("hour") / lit(24))
+            cos(lit(2 * math.pi) * col("hour") / lit(24))
         )
 
         # Day of week features
@@ -329,6 +370,10 @@ class FeatureEngineer:
         """
         logger.info("Creating all features...")
 
+        # Log dataset info
+        row_count = df.count()
+        logger.info(f"Processing {row_count} rows")
+
         # Apply all feature extraction methods
         df = self.extract_text_statistics(df)
         df = self.extract_temporal_features(df)
@@ -373,12 +418,24 @@ class FeatureEngineer:
             "vader_compound", "vader_positive", "vader_negative", "vader_neutral"
         ]
 
-        # Calculate statistics
-        stats_df = df.select(numeric_cols).describe()
+        # Filter columns that actually exist in the DataFrame
+        existing_cols = [col for col in numeric_cols if col in df.columns]
+
+        if not existing_cols:
+            logger.warning("No numeric columns found for statistics")
+            # Create a dummy statistics DataFrame
+            stats_data = [("count", "0"), ("mean", "0"), ("stddev", "0"), ("min", "0"), ("max", "0")]
+            stats_df = self.spark.createDataFrame(stats_data, ["summary", "dummy"])
+        else:
+            # Calculate statistics
+            stats_df = df.select(existing_cols).describe()
 
         # Save statistics
-        stats_df.coalesce(1).write.mode("overwrite").json(output_path)
-        logger.info(f"Feature statistics saved to: {output_path}")
+        try:
+            stats_df.coalesce(1).write.mode("overwrite").json(output_path)
+            logger.info(f"Feature statistics saved to: {output_path}")
+        except Exception as e:
+            logger.warning(f"Could not save statistics: {e}")
 
         return stats_df
 

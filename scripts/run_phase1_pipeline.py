@@ -124,4 +124,4 @@ def run_pipeline(sample_fraction: float = 0.01):
 if __name__ == "__main__":
     # Run with 1% sample for testing
     # Increase to 1.0 for full dataset processing
-    run_pipeline(sample_fraction=0.01)
+    run_pipeline(sample_fraction=0.1)
