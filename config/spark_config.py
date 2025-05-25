@@ -1,9 +1,11 @@
 """
 Spark configuration optimized for MacBook Air M4 24GB RAM
 This module handles Spark session creation with optimal settings for local development
+FIXED: Added proper environment variable handling to prevent numpy import issues
 """
 
 import os
+import sys
 from pyspark.sql import SparkSession
 from pyspark import SparkConf
 import logging
@@ -25,6 +27,15 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         SparkSession: Configured Spark session
     """
 
+    # FIX: Set Python executable paths to ensure consistent environment
+    python_exec = sys.executable  # Gets the current Python interpreter path
+
+    # Set environment variables to ensure all Spark processes use the same Python
+    os.environ["PYSPARK_PYTHON"] = python_exec
+    os.environ["PYSPARK_DRIVER_PYTHON"] = python_exec
+
+    logger.info(f"Using Python executable: {python_exec}")
+
     # Calculate memory allocation (leaving 4GB for system)
     total_memory = 20  # GB available for Spark
     driver_memory = f"{int(total_memory * 0.6)}g"  # 60% for driver
@@ -41,6 +52,11 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         conf.set("spark.driver.memory", driver_memory)
         conf.set("spark.executor.memory", executor_memory)
 
+        # FIX: Explicitly set Python executable in Spark config
+        conf.set("spark.pyspark.python", python_exec)
+        conf.set("spark.pyspark.driver.python", python_exec)
+        conf.set("spark.executorEnv.PYSPARK_PYTHON", python_exec)
+
         # Optimization for M4 architecture
         conf.set("spark.sql.adaptive.enabled", "true")
         conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
@@ -53,6 +69,10 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         # UI settings
         conf.set("spark.ui.port", "4040")
         conf.set("spark.ui.showConsoleProgress", "true")
+
+        # FIX: Add serialization settings that might help with numpy issues
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")  # Disable Arrow for now
 
     logger.info(f"Creating Spark session with driver memory: {driver_memory}")
 
