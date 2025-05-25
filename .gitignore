@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Data
+/data/
+data/raw/*
+data/processed/*
+#!data/raw/.gitkeep
+#!data/processed/.gitkeep
+/scripts/data/
+/scripts/data/*
+scripts/data/*
+scripts/data/raw/*
+/src/spark/data/
+/src/spark/data/*
+src/spark/data/*
+src/spark/data/processed/*
+
+# Models
+*.pkl
+*.h5
+*.model
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.venv
+.venv2
+
+# Jupyter
+.ipynb_checkpoints/
