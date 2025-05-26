@@ -436,26 +436,28 @@ class CompetitorAnalyzer:
                 avg("mention_count").alias("avg_mentions")
             ).collect()
 
+            safe_float = lambda x: float(x) if x is not None else 0.0
+
             if comp_metrics:
                 comp_data = comp_metrics[0]
                 insights["competitors"][competitor] = {
-                    "average_sentiment": float(comp_data["avg_sentiment"]),
-                    "average_mentions": float(comp_data["avg_mentions"]),
-                    "sentiment_gap": float(brand_metrics["avg_sentiment"] - comp_data["avg_sentiment"])
+                    "average_sentiment": safe_float(comp_data["avg_sentiment"]),
+                    "average_mentions": safe_float(comp_data["avg_mentions"]),
+                    "sentiment_gap": safe_float(brand_metrics["avg_sentiment"]) - safe_float(comp_data["avg_sentiment"])
                 }
 
                 # Identify opportunities and threats
-                if comp_data["avg_sentiment"] < brand_metrics["avg_sentiment"] - 10:
+                if safe_float(comp_data["avg_sentiment"]) < safe_float(brand_metrics["avg_sentiment"]) - 10:
                     insights["opportunities"].append({
                         "type": "sentiment_advantage",
                         "competitor": competitor,
-                        "gap": float(brand_metrics["avg_sentiment"] - comp_data["avg_sentiment"])
+                        "gap": safe_float(brand_metrics["avg_sentiment"]) - safe_float(comp_data["avg_sentiment"])
                     })
-                elif comp_data["avg_sentiment"] > brand_metrics["avg_sentiment"] + 10:
+                elif safe_float(comp_data["avg_sentiment"]) > safe_float(brand_metrics["avg_sentiment"]) + 10:
                     insights["threats"].append({
                         "type": "sentiment_disadvantage",
                         "competitor": competitor,
-                        "gap": float(comp_data["avg_sentiment"] - brand_metrics["avg_sentiment"])
+                        "gap": safe_float(comp_data["avg_sentiment"]) - safe_float(brand_metrics["avg_sentiment"])
                     })
 
         return insights

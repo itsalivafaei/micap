@@ -6,9 +6,12 @@ Validates entity recognition and competitor analysis
 import sys
 from pathlib import Path
 
+from pyspark.sql.functions import col
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 import logging
+from src.utils.path_utils import get_path
 from config.spark_config import create_spark_session
 from src.ml.entity_recognition import (
     BrandRecognizer, ProductExtractor, CompetitorMapper,
@@ -64,7 +67,7 @@ def test_competitor_analysis():
     spark = create_spark_session("TestPhase2")
 
     # Load sample data
-    df = spark.read.parquet("data/processed/pipeline_features").limit(1000)
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features"))).limit(1000)
 
     # Initialize components
     brand_recognizer = BrandRecognizer()
@@ -98,7 +101,7 @@ def test_trend_detection():
     spark = create_spark_session("TestTrends")
 
     # Load sample data
-    df = spark.read.parquet("data/processed/pipeline_features").limit(1000)
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features"))).limit(1000)
 
     # Initialize topic modeler
     topic_modeler = TopicModeler(spark, num_topics=5)

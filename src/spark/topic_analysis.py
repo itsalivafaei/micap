@@ -88,7 +88,7 @@ class TopicAnalyzer:
             inputCol="tokens_filtered",
             outputCol="our_raw_features",
             maxDF=0.9,  # Ignore terms that appear in >90% of documents
-            minDF=0.01,  # Ignore terms that appear in <10 documents
+            minDF=0.1,  # Ignore terms that appear in <10% documents
             vocabSize=vocab_size
         )
 

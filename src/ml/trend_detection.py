@@ -8,15 +8,16 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from src.utils.path_utils import get_path
 
 from pyspark.sql import SparkSession, DataFrame, Window
 from pyspark.sql.functions import (
     col, udf, count, avg, stddev, collect_list,
     array_distinct, size, when, lit, explode,
     window, desc, rank, dense_rank, percent_rank,
-    sum as spark_sum, max as spark_max, min as spark_min
+    sum as spark_sum, max as spark_max, min as spark_min, lag, expr
 )
-from pyspark.sql.types import ArrayType, StringType, FloatType, StructType, StructField
+from pyspark.sql.types import ArrayType, StringType, FloatType, StructType, StructField, IntegerType
 from pyspark.ml.feature import CountVectorizer, IDF, StopWordsRemover
 from pyspark.ml.clustering import LDA, KMeans
 from pyspark.ml import Pipeline
@@ -71,15 +72,15 @@ class TopicModeler:
         # Count vectorizer
         cv = CountVectorizer(
             inputCol="tokens_filtered",
-            outputCol="raw_features",
+            outputCol="custom_raw_features",
             maxDF=0.95,
-            minDF=10,
+            minDF=0.1,
             vocabSize=5000
         )
 
         # IDF
         idf = IDF(
-            inputCol="raw_features",
+            inputCol="custom_raw_features",
             outputCol="features"
         )
 
@@ -545,7 +546,7 @@ def main():
 
     # Load data
     logger.info("Loading data...")
-    df = spark.read.parquet("data/processed/pipeline_features")
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
 
     # Sample for testing
     df_sample = df.sample(0.1)

@@ -87,6 +87,21 @@ class BrandRecognizer:
             patterns[brand] = brand_patterns
         return patterns
 
+    @property
+    def competitor_map(self) -> Dict[str, Set[str]]:
+        """
+        Bidirectional map {brand → set(competitors)} built from the
+        config.  Constructed lazily so it costs zero time when unused.
+        """
+        if not hasattr(self, "_competitor_map"):
+            comp_map: Dict[str, Set[str]] = {}
+            for brand, data in self.brands.items():
+                comp_map.setdefault(brand, set()).update(data['competitors'])
+                for rival in data['competitors']:
+                    comp_map.setdefault(rival, set()).add(brand)
+            self._competitor_map = comp_map
+        return self._competitor_map
+
     def recognize_brands(self, text: str) -> List[Tuple[str, float]]:
         """
         Recognize brands in text with confidence scores
