@@ -74,6 +74,33 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")  # Disable Arrow for now
 
+        # ---------------------------------
+        # production / fork-safe profile
+        # ---------------------------------
+        # these three lines fix the executor crashes
+        conf.set("spark.python.use.daemon", "false")
+        conf.set("spark.python.worker.reuse", "false")
+        conf.set("spark.executorEnv.PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+        # still propagate the Apple flag as defence in depth
+        conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+        conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+
+        conf.set("spark.python.worker.faulthandler.enabled", "true")
+
+
+    # for production fork-safe vs fast profiling of python fork()
+    # if local_mode:
+    #     conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+    #     conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+    # else:
+    #     # 1) Never reuse the Python daemon → no fork() after GPU libs load
+    #     conf.set("spark.python.use.daemon", "false")
+    #     conf.set("spark.python.worker.reuse", "false")
+    #     # 2) ALSO propagate Apple’s flag as extra belt-and-braces
+    #     conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+    #     conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+
     logger.info(f"Creating Spark session with driver memory: {driver_memory}")
 
     # Create session

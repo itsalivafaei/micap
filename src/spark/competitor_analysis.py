@@ -33,7 +33,9 @@ def create_brand_recognition_udf():
             from src.ml.entity_recognition import BrandRecognizer
             # full pipeline incl. spaCy
             _recognize_brands._model = BrandRecognizer()
-        return _recognize_brands._model(text) or []
+
+        pairs = _recognize_brands._model.recognize_brands(text) or []
+        return [f"{b}:{c:.2f}" for b, c in pairs]
 
     return udf(_recognize_brands, ArrayType(StringType()))
 
