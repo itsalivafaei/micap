@@ -1,0 +1,33 @@
+{
+  "industries": {
+    "technology": {
+      "brands": [
+        {
+          "name": "Apple",
+          "aliases": ["AAPL", "iPhone", "iPad", "Mac", "MacBook"],
+          "competitors": ["Samsung", "Google", "Microsoft"],
+          "products": ["iPhone", "iPad", "MacBook", "AirPods", "Apple Watch"],
+          "keywords": ["ios", "macos", "apple store", "tim cook"]
+        },
+        {
+          "name": "Samsung",
+          "aliases": ["Galaxy", "Samsung Electronics"],
+          "competitors": ["Apple", "Google", "Xiaomi"],
+          "products": ["Galaxy S", "Galaxy Note", "Galaxy Tab", "Galaxy Watch"],
+          "keywords": ["android", "samsung pay", "one ui"]
+        }
+      ]
+    },
+    "automotive": {
+      "brands": [
+        {
+          "name": "Tesla",
+          "aliases": ["TSLA", "Tesla Motors"],
+          "competitors": ["Ford", "GM", "Rivian", "Lucid"],
+          "products": ["Model S", "Model 3", "Model X", "Model Y", "Cybertruck"],
+          "keywords": ["elon musk", "autopilot", "supercharger", "electric vehicle"]
+        }
+      ]
+    }
+  }
+}
