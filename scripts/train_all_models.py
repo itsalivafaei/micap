@@ -90,6 +90,10 @@ def train_deep_learning_models(spark, sample_size=1.0):
 
     return results
 
+# def deep_learning_models_results(spark, sample_size=1.0):
+#     logger.info("Model results from deep learning models...")
+#     return str(get_path("data/models/pipeline_results_colab.json"))
+
 
 def generate_performance_report(traditional_results, dl_results, cv_results):
     """Generate comprehensive performance report"""
@@ -167,6 +171,7 @@ def main():
 
         # Train deep learning models
         dl_results = train_deep_learning_models(spark, sample_size=1.0)
+        # dl_results = deep_learning_models_results(spark, sample_size=1.0)
 
         # Generate report
         report = generate_performance_report(traditional_results, dl_results, cv_results)

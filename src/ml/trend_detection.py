@@ -74,7 +74,7 @@ class TopicModeler:
             inputCol="tokens_filtered",
             outputCol="custom_raw_features",
             maxDF=0.95,
-            minDF=0.1,
+            minDF=0.01,
             vocabSize=5000
         )
 
@@ -549,7 +549,7 @@ def main():
     df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
 
     # Sample for testing
-    df_sample = df.sample(0.1)
+    df_sample = df.sample(0.95)
 
     # Initialize components
     topic_modeler = TopicModeler(spark, num_topics=15)
@@ -577,11 +577,11 @@ def main():
 
     # 4. Detect anomalies
     features = ["sentiment_score", "mention_count", "positive_ratio"]
-    # anomalies = anomaly_detector.detect_sentiment_anomalies(aggregated_df, features)
+    anomalies = anomaly_detector.detect_sentiment_anomalies(aggregated_df, features)
 
     # 5. Predict virality
     # Note: This assumes additional features like retweet_count
-    # virality_df = virality_predictor.calculate_virality_score(df_sample)
+    virality_df = virality_predictor.calculate_virality_score(df_sample)
 
     logger.info("Trend detection analysis complete")
 

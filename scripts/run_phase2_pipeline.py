@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def run_phase2_pipeline(sample_size: float = 0.1):
+def run_phase2_pipeline(sample_size: float = 0.95):
     """
     Run complete Phase 2 pipeline
 

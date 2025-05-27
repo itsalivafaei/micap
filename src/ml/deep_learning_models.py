@@ -7,7 +7,7 @@ Optimized for M4 Mac with Metal acceleration
 import os
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, concat
+# from pandas import DataFrame, concat
 import logging
 from typing import Dict, List, Tuple
 
@@ -55,10 +55,44 @@ class DeepLearningModel:
         self.model = None
         self.history = None
 
-    def spark_to_pandas_stream(df, batch=20_000):
-        parts = (DataFrame(rows, columns=df.columns)
-                 for rows in df.toLocalIterator(batch))
-        return concat(parts, ignore_index=True)
+    def spark_to_pandas_stream(self, df, batch_size=20_000):
+        """
+        Stream Spark DataFrame to Pandas in batches to avoid memory issues.
+        This prevents macOS crashes and optimizes RAM usage.
+
+        Args:
+            df: Spark DataFrame to convert
+            batch_size: Number of rows to process at a time
+
+        Returns:
+            Pandas DataFrame
+        """
+        # Use toLocalIterator() which returns one row at a time
+        # Then batch them manually for efficiency
+        iterator = df.toLocalIterator()
+
+        chunks = []
+        current_batch = []
+
+        for row in iterator:
+            current_batch.append(row)
+
+            if len(current_batch) >= batch_size:
+                # Convert batch to DataFrame
+                chunk_df = pd.DataFrame(current_batch, columns=df.columns)
+                chunks.append(chunk_df)
+                current_batch = []
+
+        # Don't forget the last batch
+        if current_batch:
+            chunk_df = pd.DataFrame(current_batch, columns=df.columns)
+            chunks.append(chunk_df)
+
+        # Concatenate all chunks
+        if chunks:
+            return pd.concat(chunks, ignore_index=True)
+        else:
+            return pd.DataFrame(columns=df.columns)
 
     def prepare_text_data(self, df: DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """

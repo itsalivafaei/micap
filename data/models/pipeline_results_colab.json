@@ -1,0 +1,87 @@
+{
+  "Pipeline_LSTM": {
+    "metrics": {
+      "loss": 0.08518566936254501,
+      "compile_metrics": 1.0,
+      "training_time": 38.16522240638733
+    },
+    "history": {
+      "accuracy": [
+        0.82427978515625,
+        0.9605712890625,
+        0.989349365234375,
+        0.99664306640625,
+        0.99853515625
+      ],
+      "auc": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "loss": [
+        0.5498754978179932,
+        0.3638322353363037,
+        0.22750140726566315,
+        0.1436944603919983,
+        0.09061408042907715
+      ],
+      "val_accuracy": [
+        0.9998779296875,
+        0.9998779296875,
+        0.9998779296875,
+        1.0,
+        1.0
+      ],
+      "val_auc": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "val_loss": [
+        0.10028013586997986,
+        0.0963013544678688,
+        0.08982926607131958,
+        0.08560294657945633,
+        0.08577985316514969
+      ],
+      "learning_rate": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ]
+    },
+    "feature_info": {
+      "text_column": "text_processed",
+      "numeric_features": [
+        "text_length",
+        "token_count",
+        "vader_compound",
+        "vader_positive",
+        "vader_negative",
+        "vader_neutral",
+        "emoji_sentiment",
+        "exclamation_count",
+        "question_count",
+        "uppercase_ratio",
+        "punctuation_density",
+        "hour_sin",
+        "hour_cos",
+        "is_weekend"
+      ],
+      "numeric_shape": [
+        45670,
+        14
+      ],
+      "text_samples": 45670,
+      "label_distribution": {
+        "1": 45670
+      }
+    }
+  }
+}

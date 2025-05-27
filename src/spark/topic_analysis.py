@@ -88,8 +88,8 @@ class TopicAnalyzer:
         cv = CountVectorizer(
             inputCol="tokens_filtered",
             outputCol="our_raw_features",
-            maxDF=0.9,  # Ignore terms that appear in >90% of documents
-            minDF=0.1,  # Ignore terms that appear in <10% documents
+            maxDF=0.95,  # Ignore terms that appear in >90% of documents
+            minDF=0.01,  # Ignore terms that appear in <10% documents
             vocabSize=vocab_size
         )
 
@@ -504,7 +504,7 @@ def main():
     df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
 
     # Sample for faster processing
-    df_sample = df.sample(0.1)
+    df_sample = df.sample(0.95)
 
     # Initialize analyzer
     analyzer = TopicAnalyzer(spark)
