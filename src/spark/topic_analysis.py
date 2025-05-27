@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 # import numpy as np
 import random
+from src.utils.path_utils import get_path
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
@@ -395,7 +396,7 @@ class TopicAnalyzer:
     def visualize_topics(self, df: DataFrame,
                          topic_descriptions: Dict,
                          topic_sentiment: DataFrame,
-                         output_dir: str = "/Users/ali/Documents/Projects/micap/data/visualizations"):
+                         output_dir: str = str(get_path("data/visualizations"))):
         """
         Create topic analysis visualizations
 
@@ -500,7 +501,7 @@ def main():
 
     # Load data
     logger.info("Loading data...")
-    df = spark.read.parquet("/Users/ali/Documents/Projects/micap/data/processed/pipeline_features")
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
 
     # Sample for faster processing
     df_sample = df.sample(0.1)
@@ -526,7 +527,7 @@ def main():
     analyzer.visualize_topics(df_topics, topic_descriptions, topic_sentiment)
 
     # Save results
-    output_path = "/Users/ali/Documents/Projects/micap/data/analytics/topics"
+    output_path = str(get_path("data/analytics/topics"))
     os.makedirs(output_path, exist_ok=True)
 
     topic_sentiment.coalesce(1).write.mode("overwrite").json(

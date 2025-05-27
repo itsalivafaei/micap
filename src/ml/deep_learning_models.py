@@ -7,6 +7,7 @@ Optimized for M4 Mac with Metal acceleration
 import os
 import numpy as np
 import pandas as pd
+from pandas import DataFrame, concat
 import logging
 from typing import Dict, List, Tuple
 
@@ -26,6 +27,11 @@ from pyspark.sql.functions import col, collect_list
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# def spark_to_pandas_stream(df, batch=20_000):
+#     parts = (DataFrame(rows, columns=df.columns)
+#              for rows in df.toLocalIterator(batch))
+#     return concat(parts, ignore_index=True)
 
 class DeepLearningModel:
     """
@@ -49,6 +55,11 @@ class DeepLearningModel:
         self.model = None
         self.history = None
 
+    def spark_to_pandas_stream(df, batch=20_000):
+        parts = (DataFrame(rows, columns=df.columns)
+                 for rows in df.toLocalIterator(batch))
+        return concat(parts, ignore_index=True)
+
     def prepare_text_data(self, df: DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """
         Prepare text data for deep learning
@@ -62,7 +73,12 @@ class DeepLearningModel:
         logger.info("Preparing text data for deep learning...")
 
         # Convert to Pandas for text processing
-        pdf = df.select("text", "sentiment").toPandas()
+        # pdf = df.select("text", "sentiment").toPandas()
+        ### Steam one Arrow batch at a time
+        df_small = (df.sample(0.30, seed=42)  # pull ≤50 k rows
+                    .select("text", "sentiment")
+                    .repartition(8))  # few, large partitions
+        pdf = self.spark_to_pandas_stream(df_small)
 
         # Fit tokenizer on texts
         self.tokenizer.fit_on_texts(pdf['text'].values)
@@ -119,7 +135,7 @@ class LSTMModel(DeepLearningModel):
 
     def train(self, X: np.ndarray, y: np.ndarray,
               validation_split: float = 0.2,
-              epochs: int = 10, batch_size: int = 32) -> Dict:
+              epochs: int = 10, batch_size: int = 64) -> Dict:
         """
         Train LSTM model
 

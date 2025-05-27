@@ -9,6 +9,7 @@ import sys
 import time
 import logging
 from pathlib import Path
+from src.utils.path_utils import get_path
 
 # FIX: Set environment variables before any imports
 python_exec = sys.executable
@@ -76,7 +77,8 @@ def run_pipeline(sample_fraction: float = 0.01):
         logger.info("=" * 50)
 
         ingestion = DataIngestion(spark)
-        data_path = "/Users/ali/Documents/Projects/micap/data/raw/testdata.manual.2009.06.14.csv"
+        # data_path = "/Users/ali/Documents/Projects/micap/data/raw/testdata.manual.2009.06.14.csv"
+        data_path = str(get_path("data/raw/training.1600000.processed.noemoticon.csv"))
 
         # Load full dataset
         df_raw = ingestion.load_sentiment140_data(data_path)
@@ -89,7 +91,7 @@ def run_pipeline(sample_fraction: float = 0.01):
         df_sample = ingestion.create_sample_dataset(df_clean, sample_size=sample_fraction)
 
         # Save clean sample
-        sample_path = "/Users/ali/Documents/Projects/micap/data/processed/pipeline_sample"
+        sample_path = str(get_path("data/processed/pipeline_sample"))
         ingestion.save_to_local_storage(df_sample, sample_path)
         logger.info("✓ Step 1 completed successfully")
 
@@ -102,7 +104,7 @@ def run_pipeline(sample_fraction: float = 0.01):
         df_preprocessed = preprocessor.preprocess_pipeline(df_sample)
 
         # Save preprocessed data
-        preprocessed_path = "/Users/ali/Documents/Projects/micap/data/processed/pipeline_preprocessed"
+        preprocessed_path = str(get_path("data/processed/pipeline_preprocessed"))
         df_preprocessed.coalesce(4).write.mode("overwrite").parquet(preprocessed_path)
         logger.info(f"Preprocessed {df_preprocessed.count()} records")
         logger.info("✓ Step 2 completed successfully")
@@ -122,7 +124,7 @@ def run_pipeline(sample_fraction: float = 0.01):
             logger.info("✓ Features created successfully")
 
             # Save featured data
-            features_path = "/Users/ali/Documents/Projects/micap/data/processed/pipeline_features"
+            features_path = str(get_path("data/processed/pipeline_features"))
 
             # FIX: Use explicit write with error handling
             try:
@@ -139,7 +141,7 @@ def run_pipeline(sample_fraction: float = 0.01):
 
             # Save feature statistics (optional - skip if problematic)
             try:
-                stats_path = "data/processed/pipeline_feature_stats"
+                stats_path = str(get_path("data/processed/pipeline_feature_stats"))
                 stats_df = feature_engineer.save_feature_stats(df_features, stats_path)
                 logger.info("✓ Feature statistics saved")
             except Exception as stats_error:
@@ -150,7 +152,7 @@ def run_pipeline(sample_fraction: float = 0.01):
             logger.info("Attempting to continue with preprocessed data only...")
 
             # Fallback: save preprocessed data as final output
-            fallback_path = "/Users/ali/Documents/Projects/micap/data/processed/pipeline_features_fallback"
+            fallback_path = str(get_path("data/processed/pipeline_features_fallback"))
             df_preprocessed.coalesce(4).write.mode("overwrite").parquet(fallback_path)
             logger.info(f"✓ Fallback data saved to: {fallback_path}")
 

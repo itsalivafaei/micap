@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 import logging
 from typing import Optional, Tuple
+from src.utils.path_utils import get_path
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
@@ -239,7 +240,8 @@ def main():
     ingestion = DataIngestion()
 
     # Load data
-    data_path = "/Users/ali/Documents/Projects/micap/data/raw/testdata.manual.2009.06.14.csv"
+    # data_path = "/Users/ali/Documents/Projects/micap/data/raw/testdata.manual.2009.06.14.csv"
+    data_path = str(get_path("data/raw/training.1600000.processed.noemoticon.csv"))
     df = ingestion.load_sentiment140_data(data_path)
 
     # Validate data quality
@@ -251,14 +253,14 @@ def main():
     # Save sample data
     ingestion.save_to_local_storage(
         df_sample,
-        "/Users/ali/Documents/Projects/micap/data/processed/sentiment140_sample",
+        str(get_path("data/processed/sentiment140_sample")),
         format="parquet"
     )
 
     # Partition full data
     ingestion.partition_by_date(
         df_clean,
-        "/Users/ali/Documents/Projects/micap/data/processed/sentiment140_partitioned"
+        str(get_path("data/processed/sentiment140_partitioned"))
     )
 
     # Show sample records

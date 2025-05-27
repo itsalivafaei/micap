@@ -10,6 +10,7 @@ import string
 import sys, os
 from typing import List, Dict, Optional
 import logging
+from src.utils.path_utils import get_path
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
@@ -500,7 +501,7 @@ def main():
 
     # Load sample data
     logger.info("Loading sample data...")
-    sample_path = "/Users/ali/Documents/Projects/micap/data/processed/sentiment140_sample"
+    sample_path = str(get_path("data/processed/sentiment140_sample"))
     df = spark.read.parquet(sample_path)
 
     # Initialize preprocessor
@@ -516,7 +517,7 @@ def main():
     ).show(5, truncate=False)
 
     # Save processed sample
-    output_path = "/Users/ali/Documents/Projects/micap/data/processed/sentiment140_preprocessed_sample"
+    output_path = str(get_path("data/processed/sentiment140_sample"))
     df_processed.coalesce(1).write.mode("overwrite").parquet(output_path)
     logger.info(f"Processed data saved to: {output_path}")
 

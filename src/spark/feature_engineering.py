@@ -21,6 +21,8 @@ from pyspark.sql.types import ArrayType, DoubleType, StringType
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+from src.utils.path_utils import get_path
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -478,7 +480,7 @@ def main():
     try:
         # Load preprocessed sample data
         logger.info("Loading preprocessed data...")
-        input_path = "/Users/ali/Documents/Projects/micap/data/processed/sentiment140_preprocessed_sample"
+        input_path = str(get_path("data/processed/sentiment140_sample"))
         df = spark.read.parquet(input_path)
 
         # Initialize feature engineer
@@ -488,12 +490,12 @@ def main():
         df_features = feature_engineer.create_all_features(df)
 
         # Save featured data
-        output_path = "data/processed/sentiment140_features_sample"
+        output_path = str(get_path("data/processed/sentiment140_sample"))
         df_features.coalesce(4).write.mode("overwrite").parquet(output_path)
         logger.info(f"Featured data saved to: {output_path}")
 
         # Save feature statistics
-        stats_path = "data/processed/feature_statistics"
+        stats_path = str(get_path("data/processed/feature_statistics"))
         feature_engineer.save_feature_stats(df_features, stats_path)
 
     except Exception as e:

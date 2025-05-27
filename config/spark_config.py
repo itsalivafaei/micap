@@ -33,6 +33,7 @@ def create_spark_session(app_name="MICAP", local_mode=True):
     # Set environment variables to ensure all Spark processes use the same Python
     os.environ["PYSPARK_PYTHON"] = python_exec
     os.environ["PYSPARK_DRIVER_PYTHON"] = python_exec
+    use_gpu = os.environ.get("ENABLE_GPU_LIBS") == "1"
 
     logger.info(f"Using Python executable: {python_exec}")
 
@@ -62,6 +63,16 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
         conf.set("spark.sql.adaptive.localShuffleReader.enabled", "true")
 
+        #### New
+        conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
+        conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "8000")
+        conf.set("spark.sql.shuffle.partitions", "24")
+        conf.set("spark.driver.maxResultSize", "4g")
+        conf.set("spark.network.timeout", "600s")
+        conf.set("spark.storage.memoryFraction", "0.4")
+        conf.set("spark.executor.memoryOverhead", "2048")
+
+
         # Tune for local SSD performance
         conf.set("spark.local.dir", "/tmp/spark-temp")
         conf.set("spark.sql.shuffle.partitions", "100")  # Reduced for local mode
@@ -78,8 +89,10 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         # production / fork-safe profile
         # ---------------------------------
         # these three lines fix the executor crashes
-        conf.set("spark.python.use.daemon", "false")
-        conf.set("spark.python.worker.reuse", "false")
+        # conf.set("spark.python.use.daemon", "false")
+        # conf.set("spark.python.worker.reuse", "false")
+        conf.set("spark.python.use.daemon", str(not use_gpu).lower())
+        conf.set("spark.python.worker.reuse", str(not use_gpu).lower())
         conf.set("spark.executorEnv.PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
         # still propagate the Apple flag as defence in depth
@@ -87,6 +100,9 @@ def create_spark_session(app_name="MICAP", local_mode=True):
         conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
 
         conf.set("spark.python.worker.faulthandler.enabled", "true")
+
+        # conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
+        # conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", 8000)
 
 
     # for production fork-safe vs fast profiling of python fork()

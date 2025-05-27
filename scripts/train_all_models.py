@@ -10,6 +10,8 @@ import json
 import logging
 from pathlib import Path
 
+from src.utils.path_utils import get_path
+
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -34,7 +36,7 @@ def train_traditional_models(spark, sample_size=1.0):
     logger.info("Training traditional ML models...")
 
     # Load data
-    df = spark.read.parquet("data/processed/pipeline_features")
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
     df_sample = df.sample(sample_size)
 
     # Define features
@@ -64,7 +66,7 @@ def train_traditional_models(spark, sample_size=1.0):
     )
 
     # Save results
-    output_path = "data/models"
+    output_path = str(get_path("data/models"))
     os.makedirs(output_path, exist_ok=True)
     evaluator.save_results(comparison_df, output_path)
 
@@ -82,7 +84,7 @@ def train_deep_learning_models(spark, sample_size=1.0):
     results = evaluate_deep_learning_models(spark, sample_size)
 
     # Save results
-    output_path = "data/models/deep_learning_results.json"
+    output_path = str(get_path("data/models/deep_learning_results.json"))
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=2)
 
@@ -141,7 +143,7 @@ def generate_performance_report(traditional_results, dl_results, cv_results):
     )
 
     # Save report
-    with open("data/models/performance_report.md", 'w') as f:
+    with open(str(get_path("data/models/performance_report.md")), 'w') as f:
         f.write(report)
 
     logger.info("Performance report saved")
@@ -154,7 +156,7 @@ def main():
 
     # Create directories
     os.makedirs("logs", exist_ok=True)
-    os.makedirs("data/models", exist_ok=True)
+    os.makedirs(str(get_path("data/models")), exist_ok=True)
 
     # Initialize Spark
     spark = create_spark_session("ModelTraining")

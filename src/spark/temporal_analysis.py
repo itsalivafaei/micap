@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from src.utils.path_utils import get_path
 
 from pyspark.sql import SparkSession, DataFrame, Window
 from pyspark.sql.functions import (
@@ -359,7 +360,7 @@ class TemporalAnalyzer:
         }
 
     def create_temporal_visualizations(self, trends: Dict[str, pd.DataFrame],
-                                       output_dir: str = "/Users/ali/Documents/Projects/micap/data/visualizations"):
+                                       output_dir: str = str(get_path("data/visualizations"))):
         """
         Create temporal analysis visualizations
 
@@ -484,7 +485,7 @@ def main():
 
     # Load data
     logger.info("Loading data...")
-    df = spark.read.parquet("/Users/ali/Documents/Projects/micap/data/processed/pipeline_features")
+    df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
 
     # Add time features
     df = df.withColumn("hour", F.hour(col("timestamp"))) \
@@ -506,7 +507,7 @@ def main():
     momentum_df = analyzer.calculate_sentiment_momentum(anomaly_df)
 
     # Save results
-    output_path = "/Users/ali/Documents/Projects/micap/data/analytics/temporal"
+    output_path = str(get_path("data/analytics/temporal"))
     os.makedirs(output_path, exist_ok=True)
 
     momentum_df.coalesce(1).write.mode("overwrite").parquet(
