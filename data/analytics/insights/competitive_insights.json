@@ -1,0 +1,134 @@
+{
+  "samsung": {
+    "brand": "samsung",
+    "analysis_date": "2025-05-28T15:48:38.598480",
+    "metrics": {
+      "average_sentiment": -3.5714285714285716,
+      "average_mentions": 1.7142857142857142,
+      "average_share_of_voice": 3.054505013025006
+    },
+    "competitors": {
+      "apple": {
+        "average_sentiment": -18.091660058939897,
+        "average_mentions": 59.68421052631579,
+        "sentiment_gap": 14.520231487511326
+      },
+      "xiaomi": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -3.5714285714285716
+      },
+      "google": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -3.5714285714285716
+      }
+    },
+    "opportunities": [
+      {
+        "type": "sentiment_advantage",
+        "competitor": "apple",
+        "gap": 14.520231487511326
+      }
+    ],
+    "threats": []
+  },
+  "apple": {
+    "brand": "apple",
+    "analysis_date": "2025-05-28T15:49:21.966537",
+    "metrics": {
+      "average_sentiment": -18.091660058939897,
+      "average_mentions": 59.68421052631579,
+      "average_share_of_voice": 98.34458088557886
+    },
+    "competitors": {
+      "google": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -18.091660058939897
+      },
+      "samsung": {
+        "average_sentiment": -3.5714285714285716,
+        "average_mentions": 1.7142857142857142,
+        "sentiment_gap": -14.520231487511326
+      },
+      "microsoft": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -18.091660058939897
+      }
+    },
+    "opportunities": [],
+    "threats": [
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "google",
+        "gap": 18.091660058939897
+      },
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "samsung",
+        "gap": 14.520231487511326
+      },
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "microsoft",
+        "gap": 18.091660058939897
+      }
+    ]
+  },
+  "tesla": {
+    "brand": "tesla",
+    "analysis_date": "2025-05-28T15:50:04.792418",
+    "metrics": {
+      "average_sentiment": -48.14814814814815,
+      "average_mentions": 1.5555555555555556,
+      "average_share_of_voice": 2.2380951295169877
+    },
+    "competitors": {
+      "lucid": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -48.14814814814815
+      },
+      "rivian": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -48.14814814814815
+      },
+      "gm": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -48.14814814814815
+      },
+      "ford": {
+        "average_sentiment": 0.0,
+        "average_mentions": 0.0,
+        "sentiment_gap": -48.14814814814815
+      }
+    },
+    "opportunities": [],
+    "threats": [
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "lucid",
+        "gap": 48.14814814814815
+      },
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "rivian",
+        "gap": 48.14814814814815
+      },
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "gm",
+        "gap": 48.14814814814815
+      },
+      {
+        "type": "sentiment_disadvantage",
+        "competitor": "ford",
+        "gap": 48.14814814814815
+      }
+    ]
+  }
+}

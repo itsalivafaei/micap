@@ -6,8 +6,6 @@ Implements custom NER for market intelligence
 import json
 import logging
 from typing import Dict, List, Tuple, Set, Optional
-from pathlib import Path
-import re
 from difflib import SequenceMatcher
 from src.utils.path_utils import get_path
 
@@ -48,7 +46,8 @@ class BrandRecognizer:
         if use_spacy:
             try:
                 import spacy
-                self.nlp = spacy.load("en_core_web_sm")
+                # self.nlp = spacy.load("en_core_web_sm")
+                self.nlp = spacy.load("not_now")
             except:
                 logger.warning("spaCy model not found. Using pattern matching only.")
                 # self.nlp = None

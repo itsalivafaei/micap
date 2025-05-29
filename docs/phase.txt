@@ -1,0 +1,23 @@
+scripts:
+    phase 1:
+        download data -> train all models -> run pipeline -> benchmark performance
+    phase 2:
+        run pipeline -> test
+
+src:
+    ml:
+        phase 1:
+            - sentiment models (traditional)
+            - deep learning models
+        phase 2:
+            - entity recognition
+            - trend detection
+    spark:
+        phase 1:
+            - data ingestion
+            - pre-processing
+            - feature engineering
+            - temporal analysis
+            - topic analysis
+        phase 2:
+            - competitor analysis

@@ -4,28 +4,23 @@ Implements LDA topic modeling, anomaly detection, and trend forecasting
 """
 
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
 from src.utils.path_utils import get_path
 
 from pyspark.sql import SparkSession, DataFrame, Window
 from pyspark.sql.functions import (
-    col, udf, count, avg, stddev, collect_list,
-    array_distinct, size, when, lit, explode,
-    window, desc, rank, dense_rank, percent_rank,
-    sum as spark_sum, max as spark_max, min as spark_min, lag, expr
+    col, udf, count, avg, stddev, collect_list, size, when, lit,
+    window, desc, lag, expr, abs as spark_abs
 )
-from pyspark.sql.types import ArrayType, StringType, FloatType, StructType, StructField, IntegerType
+from pyspark.sql.types import IntegerType
 from pyspark.ml.feature import CountVectorizer, IDF, StopWordsRemover
-from pyspark.ml.clustering import LDA, KMeans
+from pyspark.ml.clustering import LDA
 from pyspark.ml import Pipeline
 
 from sklearn.ensemble import IsolationForest
 from prophet import Prophet
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -139,7 +134,7 @@ class TopicModeler:
 
         return topics
 
-    def transform_topics(self, df: DataFrame) -> DataFrame:
+    def transform(self, df: DataFrame) -> DataFrame:
         """
         Transform documents to topic distributions
 
@@ -171,7 +166,7 @@ class TopicModeler:
         logger.info("Detecting emerging topics")
 
         # Get topic distributions
-        df_topics = self.transform_topics(df)
+        df_topics = self.transform(df)
 
         # Extract dominant topic for each document
         def get_dominant_topic(distribution):
@@ -220,8 +215,9 @@ class TrendForecaster:
     Forecasts sentiment and mention trends using Prophet
     """
 
-    def __init__(self):
+    def __init__(self, spark: SparkSession):
         """Initialize trend forecaster"""
+        self.spark = spark
         self.models = {}
 
     def forecast_brand_sentiment(self, df: pd.DataFrame,
@@ -314,19 +310,172 @@ class TrendForecaster:
 
         return forecasts
 
+    def forecast_sentiment_trends(self, df: DataFrame,
+                                  horizon: int = 7,
+                                  granularity: str = "daily") -> DataFrame:
+        """
+        Forecast overall sentiment trends
+
+        Args:
+            df: Spark DataFrame with sentiment data
+            horizon: Forecast horizon in days
+            granularity: Time granularity (hourly/daily)
+
+        Returns:
+            DataFrame with sentiment forecasts
+        """
+        logger.info("Forecasting overall sentiment trends")
+
+        # Aggregate sentiment by time window
+        time_window = "1 hour" if granularity == "hourly" else "1 day"
+
+        agg_df = df.groupBy(
+            window("timestamp", time_window)
+        ).agg(
+            avg("sentiment").alias("avg_sentiment"),
+            count("*").alias("tweet_count"),
+            avg("vader_compound").alias("avg_compound")
+        ).withColumn(
+            "window_start", col("window.start")
+        ).select("window_start", "avg_sentiment", "tweet_count", "avg_compound")
+
+        # Convert to pandas for Prophet
+        pdf = agg_df.toPandas()
+
+        # Forecast sentiment
+        sentiment_df = pdf[['window_start', 'avg_sentiment']].rename(
+            columns={'window_start': 'ds', 'avg_sentiment': 'y'}
+        )
+
+        if len(sentiment_df) > 10:  # Need minimum data
+            model = Prophet(
+                daily_seasonality=True,
+                weekly_seasonality=True,
+                changepoint_prior_scale=0.05
+            )
+            model.fit(sentiment_df)
+
+            future = model.make_future_dataframe(periods=horizon)
+            forecast = model.predict(future)
+
+            # Convert back to Spark DataFrame
+            forecast_df = self.spark.createDataFrame(
+                forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+            ).withColumnRenamed('ds', 'window_start') \
+                .withColumnRenamed('yhat', 'forecast') \
+                .withColumnRenamed('yhat_lower', 'lower') \
+                .withColumnRenamed('yhat_upper', 'upper')
+
+            return forecast_df
+        else:
+            # Return empty DataFrame with schema
+            return self.spark.createDataFrame([],
+                                              "window_start: timestamp, forecast: double, lower: double, upper: double")
+
+    def forecast_topic_trends(self, df: DataFrame,
+                              topic_modeler: 'TopicModeler',
+                              horizon: int = 7) -> DataFrame:
+        """
+        Forecast topic popularity trends
+
+        Args:
+            df: DataFrame with topic distributions (already transformed)
+            topic_modeler: Fitted TopicModeler instance
+            horizon: Forecast horizon in days
+
+        Returns:
+            DataFrame with topic trend forecasts
+        """
+        logger.info("Forecasting topic trends")
+
+        # Check if the DataFrame already has topicDistribution column
+        if "topicDistribution" not in df.columns:
+            # Only transform if not already transformed
+            df_with_topics = topic_modeler.transform(df)
+        else:
+            # Already transformed, use as is
+            df_with_topics = df
+
+        # Get dominant topic for each document
+        def get_dominant_topic(distribution):
+            if distribution is None:
+                return -1
+            return int(np.argmax(distribution))
+
+        dominant_topic_udf = udf(get_dominant_topic, IntegerType())
+
+        df_topics = df_with_topics.withColumn(
+            "dominant_topic",
+            dominant_topic_udf(col("topicDistribution"))
+        ).filter(col("dominant_topic") >= 0)
+
+        # Aggregate by day and topic
+        topic_trends = df_topics.groupBy(
+            window("timestamp", "1 day"),
+            "dominant_topic"
+        ).agg(
+            count("*").alias("doc_count")
+        ).withColumn(
+            "window_start", col("window.start")
+        )
+
+        # Convert to pandas for forecasting
+        pdf = topic_trends.toPandas()
+
+        # Forecast for each topic
+        all_forecasts = []
+
+        for topic_id in pdf['dominant_topic'].unique():
+            topic_df = pdf[pdf['dominant_topic'] == topic_id][['window_start', 'doc_count']].rename(
+                columns={'window_start': 'ds', 'doc_count': 'y'}
+            )
+
+            if len(topic_df) > 5:  # Need minimum data
+                try:
+                    model = Prophet(yearly_seasonality=False)
+                    model.fit(topic_df)
+
+                    future = model.make_future_dataframe(periods=horizon)
+                    forecast = model.predict(future)
+
+                    # Add topic ID
+                    forecast['topic_id'] = topic_id
+                    all_forecasts.append(
+                        forecast[['ds', 'topic_id', 'yhat', 'yhat_lower', 'yhat_upper']]
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not forecast topic {topic_id}: {e}")
+
+        if all_forecasts:
+            # Combine all forecasts
+            combined_forecast = pd.concat(all_forecasts, ignore_index=True)
+
+            # Convert back to Spark
+            forecast_df = self.spark.createDataFrame(combined_forecast) \
+                .withColumnRenamed('ds', 'window_start') \
+                .withColumnRenamed('yhat', 'forecast') \
+                .withColumnRenamed('yhat_lower', 'lower') \
+                .withColumnRenamed('yhat_upper', 'upper')
+
+            return forecast_df
+        else:
+            return self.spark.createDataFrame([],
+                                              "window_start: timestamp, topic_id: int, forecast: double, lower: double, upper: double")
+
 
 class AnomalyDetector:
     """
     Detects anomalies in sentiment patterns
     """
 
-    def __init__(self, contamination: float = 0.05):
+    def __init__(self, spark: SparkSession, contamination: float = 0.05):
         """
         Initialize anomaly detector
 
         Args:
             contamination: Expected proportion of anomalies
         """
+        self.spark = spark
         self.contamination = contamination
         self.models = {}
 
@@ -400,26 +549,27 @@ class AnomalyDetector:
         # Calculate rolling statistics
         window_spec = Window.partitionBy("brand").orderBy("window_start").rowsBetween(-7, -1)
 
-        df = df.withColumn(
-            "volume_mean",
-            avg("mention_count").over(window_spec)
-        ).withColumn(
-            "volume_std",
-            stddev("mention_count").over(window_spec)
-        )
+        #### No Such Column in Dataset
+        # df = df.withColumn(
+        #     "volume_mean",
+        #     avg("mention_count").over(window_spec)
+        # ).withColumn(
+        #     "volume_std",
+        #     stddev("mention_count").over(window_spec)
+        # )
 
         # Calculate z-score
-        df = df.withColumn(
-            "volume_zscore",
-            when(col("volume_std") > 0,
-                 (col("mention_count") - col("volume_mean")) / col("volume_std")
-                 ).otherwise(0)
-        )
+        # df = df.withColumn(
+        #     "volume_zscore",
+        #     when(col("volume_std") > 0,
+        #          (col("mention_count") - col("volume_mean")) / col("volume_std")
+        #          ).otherwise(0)
+        # )
 
         # Flag anomalies (|z-score| > 3)
         df = df.withColumn(
             "is_volume_anomaly",
-            when(abs(col("volume_zscore")) > 3, 1).otherwise(0)
+            when(spark_abs(col("volume_zscore")) > 3, 1).otherwise(0)
         ).withColumn(
             "volume_anomaly_type",
             when(col("is_volume_anomaly") == 1,
@@ -478,7 +628,7 @@ class ViralityPredictor:
         # Sentiment extremity (very positive/negative tends to go viral)
         df = df.withColumn(
             "sentiment_extremity",
-            abs(col("vader_compound"))
+            spark_abs(col("vader_compound"))
         )
 
         # Calculate virality score
@@ -553,8 +703,8 @@ def main():
 
     # Initialize components
     topic_modeler = TopicModeler(spark, num_topics=15)
-    trend_forecaster = TrendForecaster()
-    anomaly_detector = AnomalyDetector()
+    trend_forecaster = TrendForecaster(spark)
+    anomaly_detector = AnomalyDetector(spark)
     virality_predictor = ViralityPredictor(spark)
 
     # 1. Topic modeling
@@ -575,13 +725,31 @@ def main():
     # 3. Forecast trends (need aggregated data)
     # This would normally use the competitor analysis output
 
+    aggregated_df = df_sample.groupBy(
+        window("timestamp", "1 hour")
+    ).agg(
+        count("*").alias("mention_count"),
+        avg("sentiment").alias("sentiment_score"),
+        avg(when(col("sentiment") == 1, 1).otherwise(0)).alias("positive_ratio")
+    ).withColumn("window_start", col("window.start")).drop("window")
+
+    # Add brand column for compatibility
+    aggregated_df = aggregated_df.withColumn("brand", lit("general"))
+
     # 4. Detect anomalies
     features = ["sentiment_score", "mention_count", "positive_ratio"]
     anomalies = anomaly_detector.detect_sentiment_anomalies(aggregated_df, features)
+    logger.info(f"Found {anomalies.filter(col('is_anomaly') == 1).count()} anomalies")
 
     # 5. Predict virality
     # Note: This assumes additional features like retweet_count
-    virality_df = virality_predictor.calculate_virality_score(df_sample)
+    df_virality = df_sample
+    for col_name in ["retweet_count", "favorite_count", "follower_count"]:
+        if col_name not in df_virality.columns:
+            df_virality = df_virality.withColumn(col_name, lit(0))
+
+    virality_df = virality_predictor.calculate_virality_score(df_virality)
+    logger.info(f"Calculated virality scores for {virality_df.count()} tweets")
 
     logger.info("Trend detection analysis complete")
 
