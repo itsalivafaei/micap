@@ -536,38 +536,46 @@ class AnomalyDetector:
 
     def detect_volume_anomalies(self, df: DataFrame) -> DataFrame:
         """
-        Detect anomalies in mention volumes
+        Detect anomalies in tweet volumes
 
         Args:
-            df: DataFrame with mention counts
+            df: DataFrame with tweet counts
 
         Returns:
             DataFrame with volume anomaly flags
         """
         logger.info("Detecting volume anomalies")
 
-        # Calculate rolling statistics
-        window_spec = Window.partitionBy("brand").orderBy("window_start").rowsBetween(-7, -1)
+        # First aggregate by time window to get volume counts
+        volume_df = df.groupBy(
+            window("timestamp", "1 hour").alias("time_window")
+        ).agg(
+            count("*").alias("tweet_volume")
+        ).withColumn(
+            "window_start", col("time_window.start")
+        ).drop("time_window")
 
-        #### No Such Column in Dataset
-        # df = df.withColumn(
-        #     "volume_mean",
-        #     avg("mention_count").over(window_spec)
-        # ).withColumn(
-        #     "volume_std",
-        #     stddev("mention_count").over(window_spec)
-        # )
+        # Calculate rolling statistics
+        window_spec = Window.orderBy("window_start").rowsBetween(-24, -1)  # 24 hour window
+
+        volume_df = volume_df.withColumn(
+            "volume_mean",
+            avg("tweet_volume").over(window_spec)
+        ).withColumn(
+            "volume_std",
+            stddev("tweet_volume").over(window_spec)
+        )
 
         # Calculate z-score
-        # df = df.withColumn(
-        #     "volume_zscore",
-        #     when(col("volume_std") > 0,
-        #          (col("mention_count") - col("volume_mean")) / col("volume_std")
-        #          ).otherwise(0)
-        # )
+        volume_df = volume_df.withColumn(
+            "volume_zscore",
+            when(col("volume_std") > 0,
+                 (col("tweet_volume") - col("volume_mean")) / col("volume_std")
+                 ).otherwise(0)
+        )
 
         # Flag anomalies (|z-score| > 3)
-        df = df.withColumn(
+        volume_df = volume_df.withColumn(
             "is_volume_anomaly",
             when(spark_abs(col("volume_zscore")) > 3, 1).otherwise(0)
         ).withColumn(
@@ -577,7 +585,7 @@ class AnomalyDetector:
                  ).otherwise("normal")
         )
 
-        return df
+        return volume_df
 
 
 class ViralityPredictor:
@@ -594,96 +602,143 @@ class ViralityPredictor:
         """
         self.spark = spark
 
-    def calculate_virality_score(self, df: DataFrame) -> DataFrame:
+    def identify_viral_potential_simple(self, df: DataFrame) -> DataFrame:
         """
-        Calculate virality potential score
+        Identify viral potential without social media metrics
+        Uses text features as proxy for virality
 
         Args:
-            df: DataFrame with tweet data
+            df: DataFrame with text features
 
         Returns:
-            DataFrame with virality scores
+            DataFrame with viral potential scores
         """
-        logger.info("Calculating virality scores")
+        logger.info("Identifying viral potential from text features")
 
-        # Define virality features
-        df = df.withColumn(
-            "engagement_score",
-            (col("retweet_count") * 2 + col("favorite_count")) /
-            (col("follower_count") + 1)  # Normalize by followers
-        )
-
-        # Text features that correlate with virality
-        df = df.withColumn(
+        # Create virality score from available features
+        df_viral = df.withColumn(
             "has_hashtag",
             when(size(col("hashtags")) > 0, 1).otherwise(0)
         ).withColumn(
-            "has_mention",
-            when(col("text").contains("@"), 1).otherwise(0)
-        ).withColumn(
             "has_url",
             when(col("text").contains("http"), 1).otherwise(0)
-        )
-
-        # Sentiment extremity (very positive/negative tends to go viral)
-        df = df.withColumn(
+        ).withColumn(
             "sentiment_extremity",
             spark_abs(col("vader_compound"))
+        ).withColumn(
+            "engagement_features",
+            col("exclamation_count") + col("question_count") +
+            col("emoji_sentiment").cast("double")
         )
 
-        # Calculate virality score
-        df = df.withColumn(
+        # Calculate viral potential score
+        df_viral = df_viral.withColumn(
             "virality_score",
             (
-                    col("engagement_score") * 0.4 +
-                    col("sentiment_extremity") * 0.2 +
-                    col("has_hashtag") * 0.15 +
-                    col("has_mention") * 0.15 +
-                    col("has_url") * 0.1
+                    col("sentiment_extremity") * 0.3 +
+                    col("has_hashtag") * 0.2 +
+                    col("has_url") * 0.1 +
+                    col("engagement_features") * 0.1 / 10  # Normalize
             )
-        )
-
-        # Classify virality potential
-        df = df.withColumn(
+        ).withColumn(
             "virality_potential",
-            when(col("virality_score") > 0.8, "high")
-            .when(col("virality_score") > 0.5, "medium")
+            when(col("virality_score") > 0.7, "high")
+            .when(col("virality_score") > 0.4, "medium")
             .otherwise("low")
         )
 
-        return df
+        return df_viral
 
-    def identify_viral_topics(self, df: DataFrame,
-                              threshold: float = 0.7) -> DataFrame:
-        """
-        Identify topics with viral potential
+    # def calculate_virality_score(self, df: DataFrame) -> DataFrame:
+    #     """
+    #     Calculate virality potential score
+    #
+    #     Args:
+    #         df: DataFrame with tweet data
+    #
+    #     Returns:
+    #         DataFrame with virality scores
+    #     """
+    #     logger.info("Calculating virality scores")
+    #
+    #     # Define virality features
+    #     df = df.withColumn(
+    #         "engagement_score",
+    #         (col("retweet_count") * 2 + col("favorite_count")) /
+    #         (col("follower_count") + 1)  # Normalize by followers
+    #     )
+    #
+    #     # Text features that correlate with virality
+    #     df = df.withColumn(
+    #         "has_hashtag",
+    #         when(size(col("hashtags")) > 0, 1).otherwise(0)
+    #     ).withColumn(
+    #         "has_mention",
+    #         when(col("text").contains("@"), 1).otherwise(0)
+    #     ).withColumn(
+    #         "has_url",
+    #         when(col("text").contains("http"), 1).otherwise(0)
+    #     )
+    #
+    #     # Sentiment extremity (very positive/negative tends to go viral)
+    #     df = df.withColumn(
+    #         "sentiment_extremity",
+    #         spark_abs(col("vader_compound"))
+    #     )
+    #
+    #     # Calculate virality score
+    #     df = df.withColumn(
+    #         "virality_score",
+    #         (
+    #                 col("engagement_score") * 0.4 +
+    #                 col("sentiment_extremity") * 0.2 +
+    #                 col("has_hashtag") * 0.15 +
+    #                 col("has_mention") * 0.15 +
+    #                 col("has_url") * 0.1
+    #         )
+    #     )
+    #
+    #     # Classify virality potential
+    #     df = df.withColumn(
+    #         "virality_potential",
+    #         when(col("virality_score") > 0.8, "high")
+    #         .when(col("virality_score") > 0.5, "medium")
+    #         .otherwise("low")
+    #     )
+    #
+    #     return df
 
-        Args:
-            df: DataFrame with topic and virality data
-            threshold: Virality score threshold
-
-        Returns:
-            DataFrame of viral topics
-        """
-        logger.info("Identifying viral topics")
-
-        # Filter high virality content
-        viral_df = df.filter(col("virality_score") > threshold)
-
-        # Aggregate by topic
-        viral_topics = viral_df.groupBy("dominant_topic").agg(
-            count("*").alias("viral_count"),
-            avg("virality_score").alias("avg_virality_score"),
-            collect_list("text").alias("sample_texts")
-        )
-
-        # Limit sample texts
-        viral_topics = viral_topics.withColumn(
-            "sample_texts",
-            expr("slice(sample_texts, 1, 5)")
-        )
-
-        return viral_topics.orderBy(desc("viral_count"))
+    # def identify_viral_topics(self, df: DataFrame,
+    #                           threshold: float = 0.7) -> DataFrame:
+    #     """
+    #     Identify topics with viral potential
+    #
+    #     Args:
+    #         df: DataFrame with topic and virality data
+    #         threshold: Virality score threshold
+    #
+    #     Returns:
+    #         DataFrame of viral topics
+    #     """
+    #     logger.info("Identifying viral topics")
+    #
+    #     # Filter high virality content
+    #     viral_df = df.filter(col("virality_score") > threshold)
+    #
+    #     # Aggregate by topic
+    #     viral_topics = viral_df.groupBy("dominant_topic").agg(
+    #         count("*").alias("viral_count"),
+    #         avg("virality_score").alias("avg_virality_score"),
+    #         collect_list("text").alias("sample_texts")
+    #     )
+    #
+    #     # Limit sample texts
+    #     viral_topics = viral_topics.withColumn(
+    #         "sample_texts",
+    #         expr("slice(sample_texts, 1, 5)")
+    #     )
+    #
+    #     return viral_topics.orderBy(desc("viral_count"))
 
 
 # Main function for testing

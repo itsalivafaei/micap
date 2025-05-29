@@ -10,7 +10,10 @@ import json
 from src.utils.path_utils import get_path
 
 import logging
-from pyspark.sql.functions import col, size, count, avg, when, window, lit
+from pyspark.sql.functions import (
+    col, size, count, avg, when, window, lit,
+    sum as spark_sum, abs as spark_abs, explode, expr
+)
 from config.spark_config import create_spark_session
 from src.ml.entity_recognition import (
     BrandRecognizer, create_brand_recognition_udf,
@@ -28,7 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def run_phase2_pipeline(sample_size: float = 0.95):
+def run_phase2_pipeline(sample_size: float = 0.01):
     """
     Run complete Phase 2 pipeline
 
@@ -53,6 +56,7 @@ def run_phase2_pipeline(sample_size: float = 0.95):
 
         # Sample for testing
         df_sample = df.sample(sample_size)
+        # print(sample_size)
         logger.info(f"Processing {df_sample.count()} records")
 
         # Step 1: Entity Recognition
@@ -162,26 +166,57 @@ def run_phase2_pipeline(sample_size: float = 0.95):
         logger.info("Step 5: Anomaly Detection")
         logger.info("=" * 50)
 
-        # Initialize anomaly detector with spark session
+        # Initialize anomaly detector
         anomaly_detector = AnomalyDetector(spark)
-        anomaly_detector.spark = spark  # Add spark session to detector
 
-        # Detect sentiment anomalies - need to prepare the data first
-        # Create aggregated data for anomaly detection
-        aggregated_df = df_sample.groupBy(
+        # For sentiment anomalies, we need to:
+        # 1. Explode the brands array to get individual brand entries
+        # 2. Parse the brand name from the "brand:confidence" format
+        from pyspark.sql.functions import explode, expr
+
+        # Explode brands and extract brand name
+        df_brands_exploded = df_brands.select(
+            "*",
+            explode(col("brands")).alias("brand_info")
+        ).withColumn(
+            "brand",
+            expr("split(brand_info, ':')[0]")
+        ).withColumn(
+            "brand_confidence",
+            expr("cast(split(brand_info, ':')[1] as float)")
+        )
+
+        # Now aggregate by brand with the properly structured data
+        sentiment_agg = df_brands_exploded.groupBy(
             window("timestamp", "1 hour"),
-            "sentiment"
+            "brand"
         ).agg(
             count("*").alias("mention_count"),
             avg("sentiment").alias("sentiment_score"),
-            avg(when(col("sentiment") == 1, 1).otherwise(0)).alias("positive_ratio")
-        ).withColumn("window_start", col("window.start")).drop("window")
+            avg("vader_compound").alias("avg_vader_compound"),
+            spark_sum(when(col("sentiment") == 1, 1).otherwise(0)).alias("positive_count"),
+            spark_sum(when(col("sentiment") == 0, 1).otherwise(0)).alias("negative_count")
+        ).withColumn(
+            "window_start", col("window.start")
+        ).withColumn(
+            "positive_ratio",
+            when(col("mention_count") > 0,
+                 col("positive_count") / col("mention_count")
+                 ).otherwise(0)
+        ).drop("window")
 
-        # Add a dummy brand column if needed
-        aggregated_df = aggregated_df.withColumn("brand", lit("general"))
+        # Detect sentiment anomalies with the properly aggregated data
+        sentiment_anomalies = anomaly_detector.detect_sentiment_anomalies(
+            sentiment_agg,
+            features=["sentiment_score", "mention_count", "positive_ratio"]
+        )
 
+        # Save sentiment anomalies
+        sentiment_anomalies.coalesce(1).write.mode("overwrite").parquet(
+            str(get_path("data/analytics/trends/sentiment_anomalies"))
+        )
 
-        # Detect volume anomalies
+        # Detect volume anomalies using the sample data directly
         volume_anomalies = anomaly_detector.detect_volume_anomalies(df_sample)
         volume_anomalies.coalesce(1).write.mode("overwrite").parquet(
             str(get_path("data/analytics/trends/volume_anomalies"))
@@ -195,30 +230,39 @@ def run_phase2_pipeline(sample_size: float = 0.95):
         # Initialize virality predictor
         virality_predictor = ViralityPredictor(spark)
 
-        # Add required columns for virality calculation if they don't exist
-        df_virality = df_sample
-        if "retweet_count" not in df_virality.columns:
-            df_virality = df_virality.withColumn("retweet_count", lit(0))
-        if "favorite_count" not in df_virality.columns:
-            df_virality = df_virality.withColumn("favorite_count", lit(0))
-        if "follower_count" not in df_virality.columns:
-            df_virality = df_virality.withColumn("follower_count", lit(100))
+        # Since Sentiment140 doesn't have engagement metrics, we'll simulate based on content
+        # Create proxy metrics based on text features
+        df_virality = df_sample.withColumn(
+            "engagement_proxy",
+            (col("exclamation_count") + col("question_count") +
+             size(col("hashtags")) + col("emoji_sentiment").cast("double"))
+        ).withColumn(
+            "viral_potential_score",
+            (col("engagement_proxy") * 0.3 +
+             spark_abs(col("vader_compound")) * 0.4 +
+             when(size(col("hashtags")) > 0, 0.3).otherwise(0))
+        )
 
-        # Calculate virality scores
-        viral_content = virality_predictor.calculate_virality_score(df_virality)
-        viral_content = viral_content.filter(col("virality_score") > 0.7)
+        # Filter potential viral content
+        viral_content = df_virality.filter(col("viral_potential_score") > 0.7)
         viral_count = viral_content.count()
         logger.info(f"Identified {viral_count} potentially viral tweets")
 
-        viral_content.coalesce(1).write.mode("overwrite").parquet(
-            "data/analytics/trends/viral_content"
+        # Save viral content
+        viral_content.select(
+            "tweet_id", "text", "sentiment", "viral_potential_score",
+            "hashtags", "vader_compound", "emoji_sentiment"
+        ).coalesce(1).write.mode("overwrite").parquet(
+            str(get_path("data/analytics/trends/viral_content"))
         )
 
-        # Analyze viral patterns - create a summary instead
+        # Create summary instead of calling analyze_viral_patterns
         viral_patterns = {
             "total_viral_content": viral_count,
-            "virality_distribution": viral_content.groupBy("virality_potential").count().collect(),
-            "avg_virality_score": viral_content.agg(avg("virality_score")).collect()[0][0] if viral_count > 0 else 0
+            "avg_viral_score": viral_content.agg(
+                avg("viral_potential_score")
+            ).collect()[0][0] if viral_count > 0 else 0,
+            "viral_by_sentiment": viral_content.groupBy("sentiment").count().collect()
         }
 
         # Step 7: Generate Summary Report
@@ -244,9 +288,11 @@ def run_phase2_pipeline(sample_size: float = 0.95):
                 "share_of_voice_calculated": True,
                 "momentum_tracked": True
             },
+            # Update the trend_detection part of summary
             "trend_detection": {
                 "topics_discovered": len(topics),
-                "sentiment_anomalies": volume_anomalies,
+                "sentiment_anomalies": sentiment_anomalies.filter(col("is_anomaly") == 1).count(),
+                "volume_anomalies": volume_anomalies.filter(col("is_volume_anomaly") == 1).count(),
                 "viral_content_identified": viral_count
             },
             "outputs": {
@@ -273,10 +319,11 @@ def run_phase2_pipeline(sample_size: float = 0.95):
 
         # Sample outputs for verification
         logger.info("\nSample Brand Sentiment:")
-        brand_sentiment.select("brand", "avg_sentiment", "tweet_count").show(5)
+        # brand_sentiment.select("brand", "avg_sentiment", "tweet_count").show(5)
+        brand_sentiment.select("brand", "avg_sentiment", "mention_count").show(5)
 
         logger.info("\nTop Viral Content:")
-        viral_content.select("text", "virality_score", "sentiment").show(3, truncate=False)
+        viral_content.select("text", "viral_potential_score", "sentiment").show(3, truncate=False)
 
         logger.info("\nPhase 2 pipeline completed successfully!")
         logger.info(f"Results saved to data/analytics/")
@@ -292,7 +339,7 @@ def run_phase2_pipeline(sample_size: float = 0.95):
 
 
 if __name__ == "__main__":
-    # Run with configurable sample size
+    # Run with a configurable sample size
     import argparse
 
     parser = argparse.ArgumentParser(description="Run Phase 2 Pipeline")

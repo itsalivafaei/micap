@@ -1,0 +1,30 @@
+{
+  "pipeline_run": {
+    "timestamp": "2025-05-29 12:49:45",
+    "sample_size": 0.95,
+    "total_records_processed": 151753,
+    "execution_time_seconds": 207.12590312957764
+  },
+  "entity_recognition": {
+    "tweets_with_brands": 2293,
+    "unique_brands": 10,
+    "brand_coverage": 0.01511008019610815
+  },
+  "competitor_analysis": {
+    "brands_analyzed": 3,
+    "sentiment_metrics_generated": true,
+    "share_of_voice_calculated": true,
+    "momentum_tracked": true
+  },
+  "trend_detection": {
+    "topics_discovered": 15,
+    "sentiment_anomalies": 28,
+    "volume_anomalies": 19,
+    "viral_content_identified": 23716
+  },
+  "outputs": {
+    "competitor_analysis": "/Users/ali/Documents/Projects/micap/data/analytics/competitor_analysis",
+    "trend_data": "/Users/ali/Documents/Projects/micap/data/analytics/trends",
+    "insights": "/Users/ali/Documents/Projects/micap/data/analytics/insights"
+  }
+}

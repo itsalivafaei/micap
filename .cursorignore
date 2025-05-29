@@ -1,0 +1,46 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# ignore docs folder
+docs/*
+
+
+# ignore Python virtual environment
+.venv/
+
+# ignore Python bytecode and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ignore system files
+.DS_Store
+
+# ignore logs and artifacts
+logs/
+artifacts/
+src/ml/artifacts/
+src/spark/artifacts/
+scripts/artifacts/
+notebooks/artifacts/
+
+# ignore data directories
+config/
+data/
+
+# ignore test outputs
+temp_test.py
+
+# ignore Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# ignore build and dist folders
+dist/
+build/
+
+# ignore egg-info
+*.egg-info/
+
+# ignore user-specific or editor files
+*.swp
+*.swo
+*.bak
