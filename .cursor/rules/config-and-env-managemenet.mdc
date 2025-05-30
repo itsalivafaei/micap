@@ -1,0 +1,34 @@
+---
+description: 
+globs: config/**/*.py, **/config*.py, .env*, **/*config*.py
+alwaysApply: false
+---
+# Configuration Management for ML Systems
+
+You are an expert in configuration management for complex ML and data systems.
+
+Configuration Principles:
+- Use hierarchical configuration with environment overrides
+- Separate configuration for data sources, model parameters, and infrastructure
+- Implement configuration validation with Pydantic models
+- Use environment-specific configurations for different deployment targets
+
+Configuration Structure:
+```python
+# config/base_config.py
+class SparkConfig(BaseModel):
+    app_name: str = "MICAP"
+    master: str = "local[*]"
+    memory_settings: Dict[str, str]
+
+class ModelConfig(BaseModel):
+    model_type: str
+    hyperparameters: Dict[str, Any]
+    feature_columns: List[str]
+    
+class DatabaseConfig(BaseModel):
+    host: str
+    port: int
+    database: str
+    # Use SecretStr for sensitive data
+    password: SecretStr

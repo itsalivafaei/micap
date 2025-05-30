@@ -1,133 +1,215 @@
 """
-Spark configuration optimized for MacBook Air M4 24GB RAM
-This module handles Spark session creation with optimal settings for local development
-FIXED: Added proper environment variable handling to prevent numpy import issues
+Spark Configuration Module for MICAP
+Handles Spark session creation and optimization for different environments
+Optimized for M4 Mac development and production deployments
 """
 
 import os
 import sys
-from pyspark.sql import SparkSession
-from pyspark import SparkConf
 import logging
+from pathlib import Path
+from typing import Optional
+
+from pyspark.sql import SparkSession
+from pyspark.conf import SparkConf
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_spark_session(app_name="MICAP", local_mode=True):
+def get_optimal_memory_config():
     """
-    Create and configure Spark session optimized for M4 Mac with 24GB RAM
-
-    Args:
-        app_name (str): Name of the Spark application
-        local_mode (bool): Whether to run in local mode (True for development)
-
+    Get optimal memory configuration based on system resources
+    
     Returns:
-        SparkSession: Configured Spark session
+        Tuple of (driver_memory, executor_memory)
     """
+    try:
+        import psutil
+        total_memory_gb = psutil.virtual_memory().total / (1024**3)
+        
+        if total_memory_gb >= 16:
+            # High-memory system (16GB+)
+            driver_memory = "8g"
+            executor_memory = "6g"
+        elif total_memory_gb >= 8:
+            # Medium-memory system (8-16GB)
+            driver_memory = "4g" 
+            executor_memory = "3g"
+        else:
+            # Low-memory system (<8GB)
+            driver_memory = "2g"
+            executor_memory = "1g"
+            
+        logger.info(f"Detected {total_memory_gb:.1f}GB total memory")
+        logger.info(f"Configured driver: {driver_memory}, executor: {executor_memory}")
+        
+        return driver_memory, executor_memory
+        
+    except ImportError:
+        # Fallback if psutil not available
+        logger.warning("psutil not available, using default memory settings")
+        return "4g", "3g"
 
-    # FIX: Set Python executable paths to ensure consistent environment
-    python_exec = sys.executable  # Gets the current Python interpreter path
 
-    # Set environment variables to ensure all Spark processes use the same Python
+def create_spark_session(app_name: str, 
+                        environment: str = "development",
+                        enable_adaptive: bool = True,
+                        enable_arrow: bool = False) -> SparkSession:
+    """
+    Create optimized Spark session for MICAP
+    
+    Args:
+        app_name: Application name for Spark UI
+        environment: deployment environment (development, testing, production)
+        enable_adaptive: Enable adaptive query execution
+        enable_arrow: Enable Arrow-based columnar data transfers
+        
+    Returns:
+        Configured SparkSession
+    """
+    # Guarantee all workers use the same venv Python
+    python_exec = sys.executable
+    logger.info(f"Using Python executable: {python_exec}")
+    
+    # Set environment variables
     os.environ["PYSPARK_PYTHON"] = python_exec
     os.environ["PYSPARK_DRIVER_PYTHON"] = python_exec
-    use_gpu = os.environ.get("ENABLE_GPU_LIBS") == "1"
-
-    logger.info(f"Using Python executable: {python_exec}")
-
-    # Calculate memory allocation (leaving 4GB for system)
-    total_memory = 20  # GB available for Spark
-    driver_memory = f"{int(total_memory * 0.6)}g"  # 60% for driver
-    executor_memory = f"{int(total_memory * 0.4)}g"  # 40% for executors
-
-    # Create Spark configuration
+    
+    # Get optimal memory configuration
+    driver_memory, executor_memory = get_optimal_memory_config()
+    logger.info(f"Creating Spark session with driver memory: {driver_memory}")
+    
+    # Base configuration
     conf = SparkConf().setAppName(app_name)
-
-    if local_mode:
-        # Local mode configuration for M4 Mac
-        conf.setMaster("local[*]")  # Use all available cores
-
-        # Memory settings
+    
+    # Environment-specific configurations
+    if environment == "testing":
+        # Minimal resources for testing
+        conf.setMaster("local[1]")
+        conf.set("spark.driver.memory", "1g")
+        conf.set("spark.executor.memory", "1g") 
+        conf.set("spark.sql.adaptive.enabled", "false")
+        conf.set("spark.sql.adaptive.coalescePartitions.enabled", "false")
+        conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")
+        logger.info("Configured for testing environment")
+        
+    elif environment == "production":
+        # Production optimizations
+        conf.setMaster(os.getenv("SPARK_MASTER_URL", "local[*]"))
         conf.set("spark.driver.memory", driver_memory)
         conf.set("spark.executor.memory", executor_memory)
-
-        # FIX: Explicitly set Python executable in Spark config
-        conf.set("spark.pyspark.python", python_exec)
-        conf.set("spark.pyspark.driver.python", python_exec)
-        conf.set("spark.executorEnv.PYSPARK_PYTHON", python_exec)
-
-        # Optimization for M4 architecture
-        conf.set("spark.sql.adaptive.enabled", "true")
+        conf.set("spark.sql.adaptive.enabled", str(enable_adaptive).lower())
         conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        conf.set("spark.sql.adaptive.localShuffleReader.enabled", "true")
-
-        #### New
-        conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
-        conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "8000")
-        conf.set("spark.sql.shuffle.partitions", "24")
-        conf.set("spark.driver.maxResultSize", "4g")
-        conf.set("spark.network.timeout", "600s")
-        conf.set("spark.storage.memoryFraction", "0.4")
-        conf.set("spark.executor.memoryOverhead", "2048")
-
-
-        # Tune for local SSD performance
-        conf.set("spark.local.dir", "/tmp/spark-temp")
-        conf.set("spark.sql.shuffle.partitions", "100")  # Reduced for local mode
-
-        # UI settings
-        conf.set("spark.ui.port", "4040")
-        conf.set("spark.ui.showConsoleProgress", "true")
-
-        # FIX: Add serialization settings that might help with numpy issues
+        conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")  # Disable Arrow for now
-
-        # ---------------------------------
-        # production / fork-safe profile
-        # ---------------------------------
-        # these three lines fix the executor crashes
-        # conf.set("spark.python.use.daemon", "false")
-        # conf.set("spark.python.worker.reuse", "false")
-        conf.set("spark.python.use.daemon", str(not use_gpu).lower())
-        conf.set("spark.python.worker.reuse", str(not use_gpu).lower())
-        conf.set("spark.executorEnv.PYTORCH_ENABLE_MPS_FALLBACK", "1")
-
-        # still propagate the Apple flag as defence in depth
-        conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-        conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-
-        conf.set("spark.python.worker.faulthandler.enabled", "true")
-
-        # conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
-        # conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", 8000)
-
-
-    # for production fork-safe vs fast profiling of python fork()
-    # if local_mode:
-    #     conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-    #     conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-    # else:
-    #     # 1) Never reuse the Python daemon → no fork() after GPU libs load
-    #     conf.set("spark.python.use.daemon", "false")
-    #     conf.set("spark.python.worker.reuse", "false")
-    #     # 2) ALSO propagate Apple’s flag as extra belt-and-braces
-    #     conf.set("spark.driverEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-    #     conf.set("spark.executorEnv.OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
-
-    logger.info(f"Creating Spark session with driver memory: {driver_memory}")
-
+        conf.set("spark.sql.execution.arrow.pyspark.enabled", str(enable_arrow).lower())
+        logger.info("Configured for production environment")
+        
+    else:
+        # Development configuration (default)
+        conf.setMaster("local[*]")
+        conf.set("spark.driver.memory", driver_memory) 
+        conf.set("spark.executor.memory", executor_memory)
+        conf.set("spark.sql.adaptive.enabled", str(enable_adaptive).lower())
+        conf.set("spark.sql.adaptive.coalescePartitions.enabled", str(enable_adaptive).lower())
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        conf.set("spark.sql.execution.arrow.pyspark.enabled", str(enable_arrow).lower())
+        logger.info("Configured for development environment")
+    
+    # Common optimizations
+    conf.set("spark.pyspark.python", python_exec)
+    conf.set("spark.pyspark.driver.python", python_exec)  
+    conf.set("spark.executorEnv.PYSPARK_PYTHON", python_exec)
+    
+    # M4 Mac specific optimizations
+    conf.set("spark.local.dir", "/tmp/spark-temp")
+    conf.set("spark.sql.shuffle.partitions", "200")
+    conf.set("spark.default.parallelism", "8")
+    
+    # Improve stability and performance
+    conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "10000")
+    conf.set("spark.sql.execution.arrow.fallback.enabled", "true")
+    conf.set("spark.driver.maxResultSize", "2g")
+    conf.set("spark.network.timeout", "300s")
+    conf.set("spark.executor.heartbeatInterval", "20s")
+    
     # Create session
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
-
+    
     # Set log level
     spark.sparkContext.setLogLevel("WARN")
-
+    
+    # Log configuration
     logger.info("Spark session created successfully")
     logger.info(f"Spark version: {spark.version}")
     logger.info(f"Driver memory: {driver_memory}")
     logger.info(f"Executor memory: {executor_memory}")
-
+    
     return spark
+
+
+def create_minimal_spark_session(app_name: str) -> SparkSession:
+    """
+    Create minimal Spark session for testing and debugging
+    
+    Args:
+        app_name: Application name
+        
+    Returns:
+        Minimal SparkSession
+    """
+    return create_spark_session(
+        app_name=app_name,
+        environment="testing",
+        enable_adaptive=False,
+        enable_arrow=False
+    )
+
+
+def stop_spark_session(spark: SparkSession) -> None:
+    """
+    Safely stop Spark session with cleanup
+    
+    Args:
+        spark: SparkSession to stop
+    """
+    try:
+        if spark:
+            spark.stop()
+            logger.info("Spark session stopped successfully")
+    except Exception as e:
+        logger.warning(f"Error stopping Spark session: {e}")
+
+
+# Environment detection
+def get_environment() -> str:
+    """
+    Detect current environment from environment variables
+    
+    Returns:
+        Environment string (development, testing, production)
+    """
+    env = os.getenv("ENV", "development").lower()
+    if env in ["test", "testing"]:
+        return "testing"
+    elif env in ["prod", "production"]:
+        return "production"
+    else:
+        return "development"
+
+
+if __name__ == "__main__":
+    # Test configuration
+    env = get_environment()
+    logger.info(f"Detected environment: {env}")
+    
+    spark = create_spark_session("ConfigTest", environment=env)
+    
+    # Test basic functionality
+    df = spark.range(10).toDF("number")
+    count = df.count()
+    logger.info(f"Test DataFrame count: {count}")
+    
+    stop_spark_session(spark)

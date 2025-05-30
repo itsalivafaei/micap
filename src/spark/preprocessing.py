@@ -214,6 +214,116 @@ class TextPreprocessor:
 
         self.lemmatize_udf = udf(enhanced_lemmatize, StringType())
 
+        # Language detection without external dependencies
+        def detect_language_basic(text):
+            """
+            Basic language detection using common word patterns and character analysis.
+            Returns language code and confidence score.
+            """
+            try:
+                if not text or len(text.strip()) < 10:
+                    return ["unknown", 0.0]
+
+                text_lower = text.lower()
+
+                # Common English words and patterns
+                english_common = {
+                    'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have',
+                    'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you',
+                    'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they',
+                    'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one',
+                    'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out',
+                    'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when'
+                }
+
+                # Common Spanish words (for contrast)
+                spanish_common = {
+                    'el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se',
+                    'no', 'haber', 'por', 'con', 'su', 'para', 'como', 'estar',
+                    'tener', 'le', 'lo', 'todo', 'pero', 'más', 'hacer', 'o',
+                    'poder', 'decir', 'este', 'ir', 'otro', 'ese', 'si', 'me',
+                    'ya', 'ver', 'porque', 'dar', 'cuando', 'él', 'muy', 'sin'
+                }
+
+                # Common French words (for contrast)
+                french_common = {
+                    'le', 'de', 'un', 'être', 'et', 'à', 'il', 'avoir', 'ne',
+                    'je', 'son', 'que', 'se', 'qui', 'ce', 'dans', 'en', 'du',
+                    'elle', 'au', 'pour', 'pas', 'vous', 'par', 'sur', 'faire',
+                    'plus', 'dire', 'me', 'on', 'mon', 'lui', 'nous', 'comme',
+                    'mais', 'avec', 'tout', 'y', 'aller', 'voir', 'bien', 'où'
+                }
+
+                # Split into words
+                words = text_lower.split()
+                if len(words) < 3:
+                    return ["unknown", 0.0]
+
+                # Count matches
+                english_matches = sum(1 for word in words if word in english_common)
+                spanish_matches = sum(1 for word in words if word in spanish_common)
+                french_matches = sum(1 for word in words if word in french_common)
+
+                total_words = len(words)
+
+                # Calculate confidence scores
+                english_score = english_matches / total_words
+                spanish_score = spanish_matches / total_words
+                french_score = french_matches / total_words
+
+                # Additional English indicators
+                # Check for common English patterns
+                english_patterns = [
+                    r'\b(the|a|an)\s+\w+',  # Articles
+                    r'\b(is|are|was|were|been|being)\b',  # Be verbs
+                    r'\b(have|has|had|having)\b',  # Have verbs
+                    r'\b(will|would|could|should|might)\b',  # Modal verbs
+                    r'\b\w+ing\b',  # -ing endings
+                    r'\b\w+ed\b',  # -ed endings
+                ]
+
+                pattern_score = 0
+                for pattern in english_patterns:
+                    if re.search(pattern, text_lower):
+                        pattern_score += 0.1
+
+                english_score += min(pattern_score, 0.3)  # Cap pattern bonus
+
+                # Character-based analysis
+                # Check for non-ASCII characters (less common in English)
+                non_ascii_ratio = sum(1 for char in text if ord(char) > 127) / len(text)
+                if non_ascii_ratio > 0.1:
+                    english_score *= 0.8  # Reduce English confidence
+
+                # Determine language
+                if english_score > max(spanish_score, french_score) and english_score > 0.15:
+                    confidence = min(english_score * 2, 0.95)  # Scale and cap confidence
+                    return ["en", float(confidence)]
+                elif spanish_score > french_score and spanish_score > 0.15:
+                    return ["es", float(spanish_score * 2)]
+                elif french_score > 0.15:
+                    return ["fr", float(french_score * 2)]
+                else:
+                    # Check for other patterns (very basic)
+                    if re.search(r'[а-яА-Я]', text):  # Cyrillic
+                        return ["ru", 0.7]
+                    elif re.search(r'[\u4e00-\u9fff]', text):  # Chinese
+                        return ["zh", 0.8]
+                    elif re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):  # Japanese
+                        return ["ja", 0.8]
+                    elif re.search(r'[\u0600-\u06ff]', text):  # Arabic
+                        return ["ar", 0.8]
+
+                return ["unknown", 0.0]
+
+            except Exception as e:
+                logger.debug(f"Language detection error: {e}")
+                return ["unknown", 0.0]
+
+        # Register the UDF
+        from pyspark.sql.types import ArrayType, DoubleType
+        self.detect_language_udf = udf(detect_language_basic, ArrayType(DoubleType()))
+
     def clean_text(self, df: DataFrame, text_col: str = "text") -> DataFrame:
         """
         Perform basic text cleaning
@@ -329,6 +439,64 @@ class TextPreprocessor:
 
         logger.info("Emoji processing completed")
         return df
+
+    def detect_and_filter_language(self, df: DataFrame,
+                                   text_col: str = "text_clean",
+                                   target_languages: List[str] = ["en"],
+                                   min_confidence: float = 0.5) -> DataFrame:
+        """
+        Detect language and optionally filter to specific languages.
+
+        Args:
+            df: Input DataFrame
+            text_col: Column to analyze for language
+            target_languages: List of language codes to keep (e.g., ["en", "es"])
+            min_confidence: Minimum confidence threshold for language detection
+
+        Returns:
+            DataFrame with language detection results and optional filtering
+        """
+        logger.info(f"Detecting languages (filtering for: {target_languages})...")
+
+        # Apply language detection UDF
+        df = df.withColumn(
+            "lang_detection",
+            self.detect_language_udf(col(text_col))
+        )
+
+        # Extract language code and confidence
+        df = df.withColumn("detected_language", col("lang_detection")[0]) \
+            .withColumn("language_confidence", col("lang_detection")[1]) \
+            .drop("lang_detection")
+
+        # Log language distribution before filtering
+        lang_dist = df.groupBy("detected_language").count().collect()
+        logger.info("Language distribution detected:")
+        for row in lang_dist:
+            logger.info(f"  {row['detected_language']}: {row['count']} tweets")
+
+        # Filter by target languages and confidence
+        if target_languages:
+            initial_count = df.count()
+            df = df.filter(
+                (col("detected_language").isin(target_languages)) &
+                (col("language_confidence") >= min_confidence)
+            )
+            filtered_count = df.count()
+            logger.info(f"Language filtering: kept {filtered_count}/{initial_count} tweets "
+                        f"({filtered_count / initial_count * 100:.1f}%)")
+
+        return df
+
+    def get_language_specific_stopwords(self, language: str) -> set:
+        """
+        TODO: Get stop words for specific languages.
+        Args:
+            language: Language code (e.g., 'en', 'es', 'fr')
+        Returns:
+            Set of stop words for the language
+        """
+
 
     def tokenize_text(self, df: DataFrame, text_col: str = "text_clean") -> DataFrame:
         """
@@ -470,6 +638,8 @@ class TextPreprocessor:
         # Execute pipeline steps
         df = self.clean_text(df)
         df = self.handle_emojis(df)
+        # Add language detection and filtering (after emoji handling)
+        df = self.detect_and_filter_language(df, text_col="text_clean")
         df = self.tokenize_text(df)
         df = self.remove_stopwords(df)
         df = self.lemmatize_tokens(df)
@@ -480,7 +650,8 @@ class TextPreprocessor:
             "tweet_id", "text", "text_processed", "sentiment",
             "timestamp", "year", "month", "day", "hour",
             "hashtags", "emoji_sentiment", "text_length",
-            "processed_length", "token_count", "tokens_lemmatized"
+            "processed_length", "token_count", "tokens_lemmatized",
+            "detected_language", "language_confidence"
         ]
 
         df_final = df.select([col for col in columns_to_keep if col in df.columns])

@@ -1,0 +1,400 @@
+name: MICAP CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 6 AM UTC
+    - cron: '0 6 * * *'
+
+env:
+  PYTHON_VERSION: '3.11'
+  SPARK_VERSION: '3.5.0'
+  JAVA_VERSION: '11'
+
+jobs:
+  # =====================================
+  # Code Quality & Security
+  # =====================================
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install flake8 black isort mypy bandit safety pylint
+
+      - name: Code formatting check (Black)
+        run: |
+          black --check --diff src/ scripts/ tests/
+        continue-on-error: true
+
+      - name: Import sorting check (isort)
+        run: |
+          isort --check-only --diff src/ scripts/ tests/
+        continue-on-error: true
+
+      - name: Linting (flake8)
+        run: |
+          flake8 src/ scripts/ tests/ --max-line-length=100 --ignore=E203,W503
+        continue-on-error: true
+
+      - name: Advanced linting (pylint)
+        run: |
+          pylint src/ --fail-under=7.0 --disable=C0103,R0903,R0913,W0613
+        continue-on-error: true
+
+      - name: Type checking (mypy)
+        run: |
+          mypy src/ --ignore-missing-imports --strict-optional
+        continue-on-error: true
+
+      - name: Security check (bandit)
+        run: |
+          bandit -r src/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Dependency vulnerability check (safety)
+        run: |
+          safety check --json --output safety-report.json
+        continue-on-error: true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # =====================================
+  # Unit Tests
+  # =====================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    strategy:
+      matrix:
+        test-suite: [
+          'preprocessing',
+          'sentiment_models', 
+          'deep_learning',
+          'entity_recognition',
+          'trend_detection'
+        ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-cov pytest-xdist pytest-mock
+
+      - name: Download spaCy model
+        run: |
+          python -m spacy download en_core_web_sm
+
+      - name: Run unit tests with coverage
+        run: |
+          python -m pytest tests/unit/test_${{ matrix.test-suite }}.py \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=html \
+            --junitxml=test-results-${{ matrix.test-suite }}.xml \
+            -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.test-suite }}
+          path: |
+            test-results-${{ matrix.test-suite }}.xml
+            htmlcov/
+            coverage.xml
+
+  # =====================================
+  # Integration Tests
+  # =====================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_DB: micap_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-cov
+
+      - name: Download spaCy model
+        run: |
+          python -m spacy download en_core_web_sm
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/micap_test
+        run: |
+          python -m pytest tests/integration/ \
+            --cov=src \
+            --cov-report=xml \
+            --junitxml=integration-test-results.xml \
+            -v
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            integration-test-results.xml
+            coverage.xml
+
+  # =====================================
+  # Performance Tests
+  # =====================================
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf-test]')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run performance benchmarks
+        run: |
+          python scripts/benchmark_performance.py
+        timeout-minutes: 30
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            benchmarks/
+            *.png
+            *.html
+
+  # =====================================
+  # Build & Package
+  # =====================================
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Create Docker image
+        run: |
+          docker build -t micap:${{ github.sha }} .
+          docker tag micap:${{ github.sha }} micap:latest
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            *.tar.gz
+            *.whl
+
+  # =====================================
+  # Security Scanning
+  # =====================================
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # =====================================
+  # Deploy to Staging
+  # =====================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add your staging deployment commands here
+          # e.g., kubectl apply, terraform apply, etc.
+
+  # =====================================
+  # Deploy to Production
+  # =====================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add your production deployment commands here
+
+  # =====================================
+  # Notification & Cleanup
+  # =====================================
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Notify on success
+        if: needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success'
+        run: |
+          echo "Deployment successful!"
+          # Add notification logic (Slack, email, etc.)
+
+      - name: Notify on failure
+        if: needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure'
+        run: |
+          echo "Deployment failed!"
+          # Add failure notification logic 

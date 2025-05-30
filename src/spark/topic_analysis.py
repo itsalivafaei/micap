@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Dict, List, Tuple, Optional
 import pandas as pd
-# import numpy as np
+import numpy as np
 import random
 from src.utils.path_utils import get_path
 
@@ -37,7 +37,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
 class TopicAnalyzer:
     """
     Performs topic modeling and analysis on sentiment data
@@ -55,7 +54,9 @@ class TopicAnalyzer:
         # Extended stop words
         self.stop_words = list(ENGLISH_STOP_WORDS) + [
             'url', 'user', 'rt', 'amp', 'http', 'https',
-            'com', 'org', 'www', 'bit', 'ly'
+            'com', 'org', 'www', 'bit', 'ly', 'tweet', 'twitter',
+            'say', 'get', 'go', 'know', 'like', 'time', 'people',
+            'good', 'bad', 'new', 'day', 'way', 'year', 'think'
         ]
 
     def extract_topics_lda(self, df: DataFrame,
@@ -76,28 +77,40 @@ class TopicAnalyzer:
         """
         logger.info(f"Extracting {num_topics} topics using LDA...")
 
-        # Prepare text data
+        # Ensure we have the required columns
+        if "tokens_lemmatized" not in df.columns:
+            if "tokens" in df.columns:
+                df = df.withColumn("tokens_lemmatized", col("tokens"))
+            else:
+                # Create tokens from text if not available
+                df = df.withColumn("tokens", split(col("text"), " "))
+                df = df.withColumn("tokens_lemmatized", col("tokens"))
+
         # Remove stop words
         remover = StopWordsRemover(
             inputCol="tokens_lemmatized",
             outputCol="tokens_filtered",
             stopWords=self.stop_words
         )
+        df_filtered = remover.transform(df)
+
+        # Filter out empty token lists
+        df_filtered = df_filtered.filter(size(col("tokens_filtered")) > 2)
 
         # Count vectorizer
         cv = CountVectorizer(
             inputCol="tokens_filtered",
-            outputCol="our_raw_features",
-            maxDF=0.95,  # Ignore terms that appear in >90% of documents
-            minDF=0.01,  # Ignore terms that appear in <10% documents
+            outputCol="raw_features",
+            maxDF=0.8,  # Ignore terms that appear in >80% of documents
+            minDF=5,    # Ignore terms that appear in <5 documents
             vocabSize=vocab_size
         )
 
         # IDF
         idf = IDF(
-            inputCol="our_raw_features",
+            inputCol="raw_features",
             outputCol="features",
-            minDocFreq=10
+            minDocFreq=5
         )
 
         # LDA
@@ -106,21 +119,24 @@ class TopicAnalyzer:
             maxIter=max_iter,
             seed=42,
             featuresCol="features",
-            topicDistributionCol="topic_distribution"
+            topicDistributionCol="topic_distribution",
+            docConcentration=[1.1],  # Document concentration parameter
+            topicConcentration=1.1   # Topic concentration parameter
         )
 
         # Build pipeline
-        pipeline = Pipeline(stages=[remover, cv, idf, lda])
+        pipeline = Pipeline(stages=[cv, idf, lda])
 
         # Fit pipeline
-        model = pipeline.fit(df)
+        logger.info("Training LDA model...")
+        model = pipeline.fit(df_filtered)
 
         # Transform data
-        df_topics = model.transform(df)
+        df_topics = model.transform(df_filtered)
 
         # Extract topic descriptions
         lda_model = model.stages[-1]
-        cv_model = model.stages[1]
+        cv_model = model.stages[0]
 
         # Get vocabulary
         vocab = cv_model.vocabulary
@@ -135,7 +151,7 @@ class TopicAnalyzer:
             term_weights = row['termWeights']
 
             # Get top terms for this topic
-            terms = [(vocab[idx], weight) for idx, weight in
+            terms = [(vocab[idx], float(weight)) for idx, weight in
                      zip(term_indices, term_weights)]
 
             topic_descriptions[topic_id] = {
@@ -145,10 +161,9 @@ class TopicAnalyzer:
 
         # Add dominant topic to DataFrame
         def get_dominant_topic(distribution):
-            if distribution is None:
+            if distribution is None or len(distribution) == 0:
                 return -1
-            # return int(np.argmax(distribution))
-            return max(range(len(distribution)), key=lambda i: distribution[i])
+            return int(np.argmax(distribution))
 
         dominant_topic_udf = udf(get_dominant_topic, IntegerType())
         df_topics = df_topics.withColumn(
@@ -156,7 +171,7 @@ class TopicAnalyzer:
             dominant_topic_udf(col("topic_distribution"))
         )
 
-        logger.info(f"LDA topic extraction completed")
+        logger.info(f"LDA topic extraction completed with {len(topic_descriptions)} topics")
 
         return df_topics, topic_descriptions
 
@@ -176,12 +191,50 @@ class TopicAnalyzer:
         """
         logger.info(f"Clustering tweets into {num_clusters} clusters...")
 
+        # Determine features column to use
         if use_embeddings and "word2vec_features" in df.columns:
-            # Use Word2Vec embeddings
             features_col = "word2vec_features"
-        else:
-            # Use TF-IDF features
+            logger.info("Using Word2Vec embeddings for clustering")
+        elif "tfidf_features" in df.columns:
             features_col = "tfidf_features"
+            logger.info("Using TF-IDF features for clustering")
+        elif "features" in df.columns:
+            features_col = "features"
+            logger.info("Using available features for clustering")
+        else:
+            # Create TF-IDF features if none available
+            logger.info("Creating TF-IDF features for clustering...")
+            
+            # Tokenize if needed
+            if "tokens_filtered" not in df.columns:
+                if "tokens" in df.columns:
+                    remover = StopWordsRemover(
+                        inputCol="tokens",
+                        outputCol="tokens_filtered",
+                        stopWords=self.stop_words
+                    )
+                    df = remover.transform(df)
+                else:
+                    df = df.withColumn("tokens", split(col("text"), " "))
+                    remover = StopWordsRemover(
+                        inputCol="tokens",
+                        outputCol="tokens_filtered",
+                        stopWords=self.stop_words
+                    )
+                    df = remover.transform(df)
+            
+            # Create TF-IDF features
+            cv = CountVectorizer(
+                inputCol="tokens_filtered",
+                outputCol="raw_features",
+                vocabSize=1000
+            )
+            idf = IDF(inputCol="raw_features", outputCol="features")
+            
+            pipeline = Pipeline(stages=[cv, idf])
+            model = pipeline.fit(df)
+            df = model.transform(df)
+            features_col = "features"
 
         # KMeans clustering
         kmeans = KMeans(
@@ -193,14 +246,22 @@ class TopicAnalyzer:
         )
 
         # Fit model
+        logger.info("Training KMeans model...")
         model = kmeans.fit(df)
 
         # Transform data
         df_clustered = model.transform(df)
 
-        # Calculate cluster centers
+        # Calculate cluster centers and statistics
         centers = model.clusterCenters()
+        cluster_stats = df_clustered.groupBy("cluster").agg(
+            count("*").alias("cluster_size"),
+            avg("sentiment").alias("avg_sentiment")
+        ).orderBy("cluster")
+
         logger.info(f"Created {len(centers)} clusters")
+        logger.info("Cluster statistics:")
+        cluster_stats.show()
 
         return df_clustered
 
@@ -260,12 +321,28 @@ class TopicAnalyzer:
         """
         logger.info("Extracting trending topics...")
 
+        # Check if we have hashtags or create them from text
+        if "hashtags" not in df.columns:
+            # Extract hashtags from text
+            hashtag_udf = udf(lambda text: [word for word in text.split() if word.startswith('#')], ArrayType(StringType()))
+            df = df.withColumn("hashtags", hashtag_udf(col("text")))
+
+        # Check if we have timestamp
+        if "timestamp" not in df.columns:
+            logger.warning("No timestamp column found, using current time")
+            from pyspark.sql.functions import current_timestamp
+            df = df.withColumn("timestamp", current_timestamp())
+
         # Extract hashtags
         hashtag_df = df.select(
             col("timestamp"),
             explode(col("hashtags")).alias("hashtag"),
             col("sentiment")
         ).filter(col("hashtag").isNotNull())
+
+        if hashtag_df.count() == 0:
+            logger.warning("No hashtags found in data")
+            return self.spark.createDataFrame([], "window struct<start:timestamp,end:timestamp>, hashtag string, count bigint, avg_sentiment double, rank int")
 
         # Aggregate by time window and hashtag
         trending = hashtag_df.groupBy(
@@ -289,7 +366,7 @@ class TopicAnalyzer:
         return trending.orderBy("window", "rank")
 
     def identify_polarizing_topics(self, df: DataFrame,
-                                   min_tweets: int = 100) -> DataFrame:
+                                   min_tweets: int = 50) -> DataFrame:
         """
         Identify topics with high sentiment polarization
 
@@ -323,7 +400,7 @@ class TopicAnalyzer:
             2 * col("positive_ratio") * col("negative_ratio")
         ).withColumn(
             "controversy_score",
-            col("polarization_score") * col("sentiment_stddev")
+            col("polarization_score") * when(col("sentiment_stddev").isNull(), 0).otherwise(col("sentiment_stddev"))
         )
 
         # Rank by controversy
@@ -347,36 +424,29 @@ class TopicAnalyzer:
         """
         logger.info("Creating topic network...")
 
-        # Calculate topic co-occurrence
-        # Get tweets with multiple high-probability topics
-        def get_top_topics(distribution, threshold=0.2):
-            if distribution is None:
+        # Calculate topic co-occurrence based on documents with multiple topics
+        def get_top_topics(distribution, threshold=0.1):
+            if distribution is None or len(distribution) == 0:
                 return []
             topics = []
             for i, prob in enumerate(distribution):
                 if prob > threshold:
                     topics.append(i)
-            return topics
+            return topics[:3]  # Limit to top 3 topics per document
 
         top_topics_udf = udf(get_top_topics, ArrayType(IntegerType()))
 
         df_topics = df.withColumn(
             "top_topics",
             top_topics_udf(col("topic_distribution"))
-        )
+        ).filter(size(col("top_topics")) > 1)  # Only documents with multiple topics
 
-        # Create edges between co-occurring topics
-        edges = []
-
-        # This is a simplified version - in practice you'd calculate actual co-occurrence
-        num_topics = len(topic_descriptions)
-        for i in range(num_topics):
-            for j in range(i + 1, num_topics):
-                # Simulate edge weight based on topic similarity
-                # weight = np.random.random() * 0.5
-                weight = random.uniform(0, 0.5)
-                if weight > min_edge_weight:
-                    edges.append((i, j, weight))
+        # Collect topic co-occurrences
+        cooccurrences = df_topics.select("top_topics").rdd.flatMap(
+            lambda row: [(min(pair), max(pair)) for pair in 
+                        [(t1, t2) for i, t1 in enumerate(row.top_topics) 
+                         for t2 in row.top_topics[i+1:]]]
+        ).countByValue()
 
         # Create network
         G = nx.Graph()
@@ -387,16 +457,20 @@ class TopicAnalyzer:
                        label=f"Topic {topic_id}",
                        top_words=desc['top_words'][:5])
 
-        # Add edges
-        for i, j, weight in edges:
-            G.add_edge(i, j, weight=weight)
+        # Add edges based on co-occurrence
+        total_docs = df_topics.count()
+        for (topic1, topic2), count in cooccurrences.items():
+            weight = count / total_docs
+            if weight >= min_edge_weight:
+                G.add_edge(topic1, topic2, weight=weight)
 
+        logger.info(f"Created network with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
         return G
 
     def visualize_topics(self, df: DataFrame,
                          topic_descriptions: Dict,
                          topic_sentiment: DataFrame,
-                         output_dir: str = str(get_path("data/visualizations"))):
+                         output_dir: str = None):
         """
         Create topic analysis visualizations
 
@@ -406,79 +480,145 @@ class TopicAnalyzer:
             topic_sentiment: Sentiment by topic DataFrame
             output_dir: Directory to save visualizations
         """
+        if output_dir is None:
+            output_dir = str(get_path("data/visualizations/topics"))
+        
         os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Creating topic visualizations in {output_dir}")
+
+        # Convert to pandas for visualization
+        topic_dist = df.groupBy("dominant_topic").count().toPandas()
+        sentiment_df = topic_sentiment.toPandas()
 
         # 1. Topic distribution
-        topic_dist = df.groupBy("dominant_topic").count().toPandas()
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(topic_dist['dominant_topic'], topic_dist['count'])
-        ax.set_xlabel('Topic ID')
-        ax.set_ylabel('Number of Tweets')
-        ax.set_title('Topic Distribution')
+        plt.figure(figsize=(12, 6))
+        bars = plt.bar(topic_dist['dominant_topic'], topic_dist['count'])
+        plt.xlabel('Topic ID')
+        plt.ylabel('Number of Tweets')
+        plt.title('Topic Distribution')
+        plt.xticks(rotation=45)
+        
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height)}', ha='center', va='bottom')
+        
         plt.tight_layout()
-        plt.savefig(f"{output_dir}/topic_distribution.png", dpi=300)
+        plt.savefig(f"{output_dir}/topic_distribution.png", dpi=300, bbox_inches='tight')
         plt.close()
 
         # 2. Sentiment by topic
-        sentiment_df = topic_sentiment.toPandas()
-
-        fig, ax = plt.subplots(figsize=(12, 6))
-        x = sentiment_df['dominant_topic']
+        plt.figure(figsize=(14, 8))
+        x = np.arange(len(sentiment_df))
         width = 0.35
 
-        ax.bar(x - width / 2, sentiment_df['positive_count'],
+        plt.bar(x - width/2, sentiment_df['positive_count'],
                width, label='Positive', color='green', alpha=0.7)
-        ax.bar(x + width / 2, sentiment_df['negative_count'],
+        plt.bar(x + width/2, sentiment_df['negative_count'],
                width, label='Negative', color='red', alpha=0.7)
 
-        ax.set_xlabel('Topic ID')
-        ax.set_ylabel('Tweet Count')
-        ax.set_title('Sentiment Distribution by Topic')
-        ax.legend()
+        plt.xlabel('Topic ID')
+        plt.ylabel('Tweet Count')
+        plt.title('Sentiment Distribution by Topic')
+        plt.xticks(x, sentiment_df['dominant_topic'])
+        plt.legend()
         plt.tight_layout()
-        plt.savefig(f"{output_dir}/sentiment_by_topic.png", dpi=300)
+        plt.savefig(f"{output_dir}/sentiment_by_topic.png", dpi=300, bbox_inches='tight')
         plt.close()
 
         # 3. Word clouds for top topics
-        for topic_id in range(min(5, len(topic_descriptions))):
-            if topic_id in topic_descriptions:
-                words = topic_descriptions[topic_id]['top_words']
-                weights = [w[1] for w in topic_descriptions[topic_id]['terms'][:20]]
+        try:
+            for i, (topic_id, desc) in enumerate(list(topic_descriptions.items())[:6]):
+                terms = desc.get('terms', [])
+                if terms:
+                    # Create word frequency dictionary
+                    word_freq = {term[0]: float(term[1]) for term in terms[:20]}
+                    
+                    if word_freq:
+                        # Generate word cloud
+                        wordcloud = WordCloud(
+                            width=800, height=400,
+                            background_color='white',
+                            max_words=20,
+                            colormap='viridis'
+                        ).generate_from_frequencies(word_freq)
 
-                # Create word frequency dictionary
-                word_freq = {word: weight for word, weight in
-                             zip(words[:20], weights)}
-
-                # Generate word cloud
-                wordcloud = WordCloud(
-                    width=800, height=400,
-                    background_color='white'
-                ).generate_from_frequencies(word_freq)
-
-                plt.figure(figsize=(10, 5))
-                plt.imshow(wordcloud, interpolation='bilinear')
-                plt.axis('off')
-                plt.title(f'Topic {topic_id} Word Cloud')
-                plt.tight_layout()
-                plt.savefig(f"{output_dir}/topic_{topic_id}_wordcloud.png",
-                            dpi=300)
-                plt.close()
+                        plt.figure(figsize=(10, 5))
+                        plt.imshow(wordcloud, interpolation='bilinear')
+                        plt.axis('off')
+                        plt.title(f'Topic {topic_id} - Top Words')
+                        plt.tight_layout()
+                        plt.savefig(f"{output_dir}/topic_{topic_id}_wordcloud.png",
+                                    dpi=300, bbox_inches='tight')
+                        plt.close()
+        except Exception as e:
+            logger.warning(f"Could not create word clouds: {e}")
 
         # 4. Topic sentiment heatmap
-        pivot_df = sentiment_df.set_index('dominant_topic')[
-            ['avg_sentiment', 'positive_ratio', 'avg_vader_compound']
-        ]
+        try:
+            if len(sentiment_df) > 0:
+                # Prepare data for heatmap
+                metrics = ['avg_sentiment', 'positive_ratio']
+                if 'avg_vader_compound' in sentiment_df.columns:
+                    metrics.append('avg_vader_compound')
+                
+                heatmap_data = sentiment_df.set_index('dominant_topic')[metrics].T
 
-        fig, ax = plt.subplots(figsize=(8, 10))
-        sns.heatmap(pivot_df.T, annot=True, fmt='.3f',
-                    cmap='RdBu_r', center=0.5, ax=ax)
-        ax.set_xlabel('Topic ID')
-        ax.set_ylabel('Metric')
-        ax.set_title('Topic Sentiment Metrics')
-        plt.tight_layout()
-        plt.savefig(f"{output_dir}/topic_sentiment_heatmap.png", dpi=300)
-        plt.close()
+                plt.figure(figsize=(12, 6))
+                sns.heatmap(heatmap_data, annot=True, fmt='.3f',
+                           cmap='RdBu_r', center=0.5, cbar_kws={'label': 'Sentiment Score'})
+                plt.xlabel('Topic ID')
+                plt.ylabel('Metric')
+                plt.title('Topic Sentiment Metrics Heatmap')
+                plt.tight_layout()
+                plt.savefig(f"{output_dir}/topic_sentiment_heatmap.png", dpi=300, bbox_inches='tight')
+                plt.close()
+        except Exception as e:
+            logger.warning(f"Could not create sentiment heatmap: {e}")
+
+        # 5. Topic network visualization
+        try:
+            if len(topic_descriptions) > 1:
+                # Create a simple topic similarity network
+                plt.figure(figsize=(12, 8))
+                
+                # Create a simple network based on word overlap
+                G = nx.Graph()
+                topics = list(topic_descriptions.keys())
+                
+                # Add nodes
+                for topic_id in topics:
+                    G.add_node(topic_id)
+                
+                # Add edges based on word similarity
+                for i, topic1 in enumerate(topics):
+                    for topic2 in topics[i+1:]:
+                        words1 = set(topic_descriptions[topic1]['top_words'][:10])
+                        words2 = set(topic_descriptions[topic2]['top_words'][:10])
+                        similarity = len(words1.intersection(words2)) / len(words1.union(words2))
+                        
+                        if similarity > 0.1:  # Threshold for edge creation
+                            G.add_edge(topic1, topic2, weight=similarity)
+                
+                # Draw network
+                pos = nx.spring_layout(G, k=3, iterations=50)
+                nx.draw_networkx_nodes(G, pos, node_color='lightblue', 
+                                     node_size=1000, alpha=0.7)
+                nx.draw_networkx_labels(G, pos)
+                
+                # Draw edges with varying thickness
+                edges = G.edges()
+                weights = [G[u][v]['weight'] for u, v in edges]
+                nx.draw_networkx_edges(G, pos, width=[w*3 for w in weights], alpha=0.6)
+                
+                plt.title('Topic Similarity Network')
+                plt.axis('off')
+                plt.tight_layout()
+                plt.savefig(f"{output_dir}/topic_network.png", dpi=300, bbox_inches='tight')
+                plt.close()
+        except Exception as e:
+            logger.warning(f"Could not create topic network: {e}")
 
         logger.info(f"Topic visualizations saved to {output_dir}")
 
@@ -492,75 +632,105 @@ def main():
     # Create Spark session
     spark = create_spark_session("TopicAnalysis")
 
-    # After you create 'spark'
-    rdd = spark.range(1).rdd.mapPartitions(
-        lambda _: [(__import__("numpy").__version__,)]
-    )
-    df = rdd.toDF(["numpy_version"])
-    df.show()
+    try:
+        # Load data
+        logger.info("Loading data...")
+        data_path = str(get_path("data/processed/pipeline_features"))
+        if not os.path.exists(data_path):
+            logger.error(f"Data not found at {data_path}. Please run Phase 1 pipeline first.")
+            return
 
-    # Load data
-    logger.info("Loading data...")
-    df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
+        df = spark.read.parquet(data_path)
+        logger.info(f"Loaded {df.count()} records")
 
-    # Sample for faster processing
-    df_sample = df.sample(0.95)
+        # Sample for faster processing
+        df_sample = df.sample(0.1, seed=42)
+        sample_count = df_sample.count()
+        logger.info(f"Using {sample_count} records for analysis")
 
-    # Initialize analyzer
-    analyzer = TopicAnalyzer(spark)
+        # Initialize analyzer
+        analyzer = TopicAnalyzer(spark)
 
-    # Extract topics using LDA
-    df_topics, topic_descriptions = analyzer.extract_topics_lda(
-        df_sample, num_topics=10
-    )
+        # Extract topics using LDA
+        logger.info("\n=== TOPIC EXTRACTION ===")
+        df_topics, topic_descriptions = analyzer.extract_topics_lda(
+            df_sample, num_topics=8, max_iter=10
+        )
 
-    # Analyze sentiment by topic
-    topic_sentiment = analyzer.analyze_sentiment_by_topic(df_topics)
+        # Analyze sentiment by topic
+        logger.info("\n=== SENTIMENT ANALYSIS BY TOPIC ===")
+        topic_sentiment = analyzer.analyze_sentiment_by_topic(df_topics)
 
-    # Identify polarizing topics
-    polarizing_topics = analyzer.identify_polarizing_topics(df_topics)
+        # Cluster tweets
+        logger.info("\n=== CONTENT CLUSTERING ===")
+        df_clustered = analyzer.cluster_tweets_by_content(df_topics, num_clusters=10)
 
-    # Extract trending topics
-    trending = analyzer.extract_trending_topics(df_sample)
+        # Identify polarizing topics
+        logger.info("\n=== POLARIZING TOPICS ===")
+        polarizing_topics = analyzer.identify_polarizing_topics(df_topics)
 
-    # Create visualizations
-    analyzer.visualize_topics(df_topics, topic_descriptions, topic_sentiment)
+        # Extract trending topics
+        logger.info("\n=== TRENDING TOPICS ===")
+        trending = analyzer.extract_trending_topics(df_sample)
 
-    # Save results
-    output_path = str(get_path("data/analytics/topics"))
-    os.makedirs(output_path, exist_ok=True)
+        # Create visualizations
+        logger.info("\n=== CREATING VISUALIZATIONS ===")
+        analyzer.visualize_topics(df_topics, topic_descriptions, topic_sentiment)
 
-    topic_sentiment.coalesce(1).write.mode("overwrite").json(
-        f"{output_path}/topic_sentiment"
-    )
+        # Save results
+        logger.info("\n=== SAVING RESULTS ===")
+        output_path = str(get_path("data/analytics/topics"))
+        os.makedirs(output_path, exist_ok=True)
 
-    # Save topic descriptions
-    import json
-    with open(f"{output_path}/topic_descriptions.json", 'w') as f:
-        json.dump(topic_descriptions, f, indent=2)
+        # Save topic sentiment analysis
+        topic_sentiment.coalesce(1).write.mode("overwrite").json(
+            f"{output_path}/topic_sentiment"
+        )
 
-    # Show results
-    logger.info("\nTopic descriptions:")
-    for topic_id, desc in topic_descriptions.items():
-        logger.info(f"Topic {topic_id}: {desc['top_words'][:5]}")
+        # Save topic descriptions
+        import json
+        with open(f"{output_path}/topic_descriptions.json", 'w') as f:
+            json.dump({str(k): v for k, v in topic_descriptions.items()}, f, indent=2)
 
-    logger.info("\nSentiment by topic:")
-    topic_sentiment.select(
-        "dominant_topic", "tweet_count", "avg_sentiment",
-        "positive_ratio", "avg_vader_compound"
-    ).show(10)
+        # Save polarizing topics
+        polarizing_topics.coalesce(1).write.mode("overwrite").json(
+            f"{output_path}/polarizing_topics"
+        )
 
-    logger.info("\nMost polarizing topics:")
-    polarizing_topics.select(
-        "dominant_topic", "tweet_count", "polarization_score",
-        "controversy_score"
-    ).show(5)
+        # Display results
+        logger.info("\n=== RESULTS SUMMARY ===")
+        logger.info("\nTopic descriptions:")
+        for topic_id, desc in topic_descriptions.items():
+            logger.info(f"Topic {topic_id}: {', '.join(desc['top_words'][:5])}")
 
-    logger.info("\nTrending hashtags:")
-    trending.show(20)
+        logger.info("\nSentiment by topic:")
+        topic_sentiment.select(
+            "dominant_topic", "tweet_count", "avg_sentiment",
+            "positive_ratio"
+        ).show(10, truncate=False)
 
-    # Stop Spark
-    spark.stop()
+        logger.info("\nMost polarizing topics:")
+        polarizing_topics.select(
+            "dominant_topic", "tweet_count", "polarization_score",
+            "controversy_score"
+        ).show(5, truncate=False)
+
+        if trending.count() > 0:
+            logger.info("\nTrending hashtags:")
+            trending.show(10, truncate=False)
+        else:
+            logger.info("No trending hashtags found")
+
+        logger.info(f"\nResults saved to: {output_path}")
+        logger.info("✓ Topic analysis completed successfully!")
+
+    except Exception as e:
+        logger.error(f"Topic analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Stop Spark
+        spark.stop()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,32 @@
+---
+description: 
+globs: src/ml/**/*.py, **/sentiment*.py, **/nlp*.py
+alwaysApply: false
+---
+# Production NLP & Sentiment Analysis Systems
+
+You are an expert in production NLP systems, sentiment analysis, and transformer-based models.
+
+NLP-Specific Patterns:
+- Implement efficient text preprocessing pipelines that scale to millions of documents
+- Use proper tokenization strategies for different text domains (social media, news, etc.)
+- Implement caching for expensive NLP operations (embeddings, model inference)
+- Design proper evaluation frameworks for sentiment analysis models
+
+Model Management:
+- Implement proper model versioning for transformer models
+- Use model quantization and optimization for production deployment
+- Implement proper GPU memory management for large language models
+- Design fallback mechanisms for model serving failures
+
+Feature Engineering:
+- Implement distributed feature engineering for text data using Spark
+- Use proper text vectorization techniques (TF-IDF, embeddings) at scale
+- Implement temporal feature engineering for time-series sentiment analysis
+- Design feature pipelines that handle streaming text data
+
+Evaluation & Monitoring:
+- Implement proper evaluation metrics for imbalanced sentiment datasets
+- Set up continuous model evaluation on production data
+- Monitor for concept drift in sentiment patterns over time
+- Implement A/B testing frameworks for sentiment model comparison

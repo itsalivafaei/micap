@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+### Rule 9: Documentation & Code Quality
+```markdown
+# Documentation Standards for Complex ML Projects
+
+You are an expert in documenting machine learning systems and data pipelines.
+
+Documentation Philosophy:
+- Document the "why" behind architectural decisions, especially for ML model choices
+- Include performance benchmarks and model evaluation results
+- Document data assumptions and business logic clearly
+- Provide runnable examples for all major components
+
+Code Documentation:
+- Use comprehensive docstrings for all public functions with parameter types and expected ranges
+- Include usage examples in docstrings for complex functions
+- Document side effects and performance characteristics
+- Use type hints consistently throughout the codebase
+
+API Documentation:
+- Use OpenAPI/FastAPI automatic documentation with comprehensive examples
+- Document expected input/output schemas with realistic examples
+- Include error response examples and troubleshooting guides
+- Document rate limits and performance characteristics
+
+System Documentation:
+- Maintain architecture decision records (ADRs) for major technical decisions
+- Document data flow and dependencies between components
+- Include deployment guides with environment-specific instructions
+- Maintain troubleshooting guides for common issues

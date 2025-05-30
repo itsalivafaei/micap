@@ -1,0 +1,32 @@
+---
+description: ML/Data Pipeline Testing Standards
+globs: 
+alwaysApply: false
+---
+# ML/Data Pipeline Testing Standards
+
+You are an expert in testing machine learning systems and data pipelines.
+
+Testing Philosophy:
+- Test data transformations with representative sample data
+- Implement property-based testing for data validation functions
+- Use contract testing for API endpoints that serve ML predictions
+- Test model performance with holdout datasets and statistical validation
+
+Test Categories:
+- Unit tests for individual functions and transformations
+- Integration tests for end-to-end pipeline execution
+- Data quality tests that validate schema and distributions
+- Model performance tests that check for regression in accuracy metrics
+
+Spark Testing:
+- Use spark-testing-base for distributed data testing
+- Implement proper test data fixtures that represent production data characteristics
+- Test for data consistency across different partitioning strategies
+- Validate transformations produce expected output schemas
+
+ML Model Testing:
+- Test model serialization and deserialization
+- Validate model inference performance and accuracy
+- Test for model robustness with edge cases and adversarial inputs
+- Implement regression tests for model performance metrics

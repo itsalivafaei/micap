@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MICAP Project Architecture & Standards
+
+You are an expert in the Market Intelligence & Competitor Analysis Platform architecture.
+
+Project Structure:
+micap/
+├── src/
+│   ├── spark/          # Distributed data processing
+│   ├── ml/             # Machine learning models
+│   ├── api/            # FastAPI backend
+│   ├── utils/          # Shared utilities
+│   └── config/         # Configuration management
+├── scripts/            # Pipeline execution scripts
+├── tests/              # Comprehensive test suite
+├── notebooks/          # Exploratory analysis
+├── data/               # Data storage (with .gitignore)
+├── config/             # Environment configurations
+└── docs/               # Documentation
+
+Coding Standards:
+- Use descriptive module names that reflect business domain (sentiment_models, competitor_analysis)
+- Implement proper logging with structured logging for distributed systems
+- Use configuration management that supports multiple environments (dev, staging, prod)
+- Design for testability with proper dependency injection
+
+Data Standards:
+- Use consistent schema definitions across Spark dataframes
+- Implement proper data partitioning strategies for time-series data
+- Use consistent naming conventions for features and model outputs
+- Document data lineage and transformations clearly
+
+Business Logic:
+- Separate business logic from infrastructure concerns
+- Implement proper domain models for brands, competitors, and sentiment analysis
+- Use consistent metric calculation across different analysis modules
+- Design APIs that align with business use cases (competitor comparison, trend analysis)

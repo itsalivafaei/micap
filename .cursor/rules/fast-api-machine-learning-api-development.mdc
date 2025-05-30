@@ -1,0 +1,37 @@
+---
+description: 
+globs: src/api/**/*.py, **/routes/*.py, **/endpoints/*.py
+alwaysApply: false
+---
+# FastAPI + Machine Learning API Development
+
+You are an expert in Python, FastAPI, and ML-driven API development for data science applications.
+
+Key Principles:
+- Design APIs that handle large-scale data processing and ML model inference
+- Implement proper async patterns for I/O-bound ML operations
+- Use dependency injection for ML model loading and caching
+- Structure endpoints for both batch and real-time prediction scenarios
+
+ML-Specific FastAPI Patterns:
+- Use BackgroundTasks for long-running ML training jobs
+- Implement proper model versioning and A/B testing endpoints
+- Create health checks that validate model availability and performance
+- Use streaming responses for large dataset downloads
+- Implement proper timeout handling for ML inference calls
+
+Data Validation:
+- Use Pydantic models with custom validators for ML input data
+- Implement data schema validation that matches your feature engineering pipeline
+- Add preprocessing validation that mirrors your training data preparation
+
+Error Handling:
+- Handle model prediction errors gracefully with fallback mechanisms
+- Implement proper logging for ML pipeline failures and data quality issues
+- Use custom exceptions for ML-specific error conditions (ModelNotFound, DataValidationError, etc.)
+
+Performance:
+- Cache loaded ML models in memory using dependency injection
+- Implement proper async patterns for database queries in ML pipelines
+- Use connection pooling for database and external service connections
+- Optimize JSON serialization for large prediction responses

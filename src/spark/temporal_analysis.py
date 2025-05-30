@@ -36,6 +36,22 @@ logger = logging.getLogger(__name__)
 
 # safe ratio helper  (Spark ≥3.5)
 def safe_ratio(numer, denom):
+    """
+    Safely divide two columns, returning NULL when denominator is 0.
+    
+    This function prevents division by zero errors in Spark DataFrames
+    by using the try_divide function (Spark 3.5+) or conditional logic.
+    
+    Args:
+        numer: Numerator column or expression
+        denom: Denominator column or expression
+    
+    Returns:
+        Spark column with division result or NULL for zero denominators
+    
+    Example:
+        >>> df.withColumn("ratio", safe_ratio(col("sales"), col("visits")))
+    """
     return F.try_divide(numer, denom)         # NULL when denom = 0
     # On Spark <3.5 use: F.when(denom != 0, numer / denom)
 

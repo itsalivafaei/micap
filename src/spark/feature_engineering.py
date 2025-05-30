@@ -12,9 +12,9 @@ from pyspark.sql.functions import (
     col, count, sum as spark_sum, mean, stddev,
     explode, array, collect_list, size, when,
     regexp_extract, length, udf, desc, row_number, lit, date_format,
-    regexp_replace, col, date_format, hour, when, lit, sin, cos, udf
+    regexp_replace, col, date_format, hour, when, lit, sin, cos, udf, array_contains
 )
-from pyspark.sql.types import ArrayType, DoubleType, StringType
+from pyspark.sql.types import ArrayType, DoubleType, StringType, IntegerType
 
 # FIX: Import only basic Spark SQL functions, not ML features at module level
 # ML features will be imported lazily inside functions when needed
@@ -411,18 +411,22 @@ class FeatureEngineer:
             df = self.extract_text_statistics(df)
             df = self.extract_temporal_features(df)
             df = self.extract_lexicon_features(df)
+            df = self.extract_entity_features(df)  # Add this line
             df = self.extract_ngram_features(df)
             df = self.create_tfidf_features(df, num_features=self.tfidf_features)
             df = self.generate_word_embeddings(df, vector_size=self.word2vec_size)
 
-            # Create feature summary
+            # Update feature summary to include entity features
             feature_cols = [
                 "text_length", "processed_length", "token_count",
                 "emoji_sentiment", "exclamation_count", "question_count",
                 "uppercase_ratio", "punctuation_density",
                 "vader_compound", "vader_positive", "vader_negative", "vader_neutral",
                 "hour_sin", "hour_cos", "is_weekend",
-                "2gram_count", "3gram_count"
+                "2gram_count", "3gram_count",
+                "brand_count", "category_count", "has_competitor_comparison",  # Add these
+                "has_apple", "has_samsung", "has_google", "has_microsoft",  # Add these
+                "has_amazon", "has_tesla"  # Add these
             ]
 
             logger.info(f"Created {len(feature_cols)} basic features + TF-IDF + Word2Vec")
@@ -466,6 +470,168 @@ class FeatureEngineer:
             logger.warning(f"Could not save statistics: {e}")
             stats_data = [("error", str(e))]
             return self.spark.createDataFrame(stats_data, ["summary", "message"])
+
+    def extract_entity_features(self, df: DataFrame,
+                                text_col: str = "text") -> DataFrame:
+        """
+        Extract named entity features for brand/product recognition
+        Uses pattern matching and dictionary-based approach for distributed processing
+
+        Args:
+            df: Input DataFrame
+            text_col: Column containing text
+
+        Returns:
+            DataFrame with entity features
+        """
+        logger.info("Extracting named entity features...")
+
+        try:
+            # Define common tech brands and products for pattern matching
+            # This is a simplified approach suitable for distributed processing
+            tech_brands = [
+                'apple', 'iphone', 'ipad', 'macbook', 'airpods', 'ios',
+                'samsung', 'galaxy', 'android',
+                'google', 'pixel', 'chrome', 'gmail',
+                'microsoft', 'windows', 'xbox', 'surface',
+                'amazon', 'alexa', 'kindle', 'aws',
+                'tesla', 'model s', 'model 3', 'model x', 'model y',
+                'facebook', 'meta', 'instagram', 'whatsapp',
+                'twitter', 'tweet',
+                'netflix', 'spotify', 'youtube',
+                'uber', 'lyft', 'airbnb',
+                'playstation', 'nintendo', 'switch'
+            ]
+
+            # Broadcast the brand list for efficiency
+            brands_broadcast = self.spark.sparkContext.broadcast(tech_brands)
+
+            # UDF to extract brand mentions
+            def extract_brands(text):
+                """Extract brand mentions from text"""
+                if not text:
+                    return []
+
+                text_lower = text.lower()
+                found_brands = []
+
+                # Check for each brand in the text
+                for brand in brands_broadcast.value:
+                    # Use word boundaries to avoid partial matches
+                    import re
+                    pattern = r'\b' + re.escape(brand) + r'\b'
+                    if re.search(pattern, text_lower):
+                        found_brands.append(brand)
+
+                return found_brands
+
+            # UDF to count brand mentions
+            def count_brand_mentions(text):
+                """Count total brand mentions in text"""
+                if not text:
+                    return 0
+
+                text_lower = text.lower()
+                mention_count = 0
+
+                for brand in brands_broadcast.value:
+                    import re
+                    pattern = r'\b' + re.escape(brand) + r'\b'
+                    matches = re.findall(pattern, text_lower)
+                    mention_count += len(matches)
+
+                return mention_count
+
+            # Pattern-based entity extraction for product categories
+            def extract_product_categories(text):
+                """Extract product category mentions"""
+                if not text:
+                    return []
+
+                text_lower = text.lower()
+                categories = []
+
+                # Product category patterns
+                phone_pattern = r'\b(phone|smartphone|mobile|cellphone)\b'
+                laptop_pattern = r'\b(laptop|notebook|computer|pc|mac)\b'
+                tablet_pattern = r'\b(tablet|ipad)\b'
+                car_pattern = r'\b(car|vehicle|automobile|suv|sedan)\b'
+                app_pattern = r'\b(app|application|software)\b'
+
+                import re
+                if re.search(phone_pattern, text_lower):
+                    categories.append('phone')
+                if re.search(laptop_pattern, text_lower):
+                    categories.append('laptop')
+                if re.search(tablet_pattern, text_lower):
+                    categories.append('tablet')
+                if re.search(car_pattern, text_lower):
+                    categories.append('car')
+                if re.search(app_pattern, text_lower):
+                    categories.append('app')
+
+                return categories
+
+            # Create UDFs
+            extract_brands_udf = udf(extract_brands, ArrayType(StringType()))
+            count_mentions_udf = udf(count_brand_mentions, IntegerType())
+            extract_categories_udf = udf(extract_product_categories, ArrayType(StringType()))
+
+            # Apply entity extraction
+            df = df.withColumn("brand_mentions", extract_brands_udf(col(text_col)))
+            df = df.withColumn("brand_count", count_mentions_udf(col(text_col)))
+            df = df.withColumn("product_categories", extract_categories_udf(col(text_col)))
+            df = df.withColumn("category_count", size(col("product_categories")))
+
+            # Create binary features for top brands (presence indicators)
+            top_brands = ['apple', 'samsung', 'google', 'microsoft', 'amazon', 'tesla']
+            for brand in top_brands:
+                df = df.withColumn(
+                    f"has_{brand}",
+                    when(array_contains(col("brand_mentions"), brand), 1).otherwise(0)
+                )
+
+            # Add competitor co-mention feature
+            def has_competitor_mentions(brands):
+                """Check if multiple competing brands are mentioned"""
+                if not brands or len(brands) < 2:
+                    return 0
+
+                # Define competitor groups
+                competitors = [
+                    {'apple', 'samsung', 'google'},  # Phone competitors
+                    {'microsoft', 'google', 'apple'},  # Tech giants
+                    {'uber', 'lyft'},  # Rideshare
+                    {'netflix', 'spotify', 'youtube'}  # Entertainment
+                ]
+
+                brand_set = set(brands)
+                for comp_group in competitors:
+                    if len(brand_set.intersection(comp_group)) >= 2:
+                        return 1
+                return 0
+
+            competitor_udf = udf(has_competitor_mentions, IntegerType())
+            df = df.withColumn("has_competitor_comparison",
+                               competitor_udf(col("brand_mentions")))
+
+            logger.info("Entity feature extraction completed")
+            return df
+
+        except Exception as e:
+            logger.error(f"Entity extraction failed: {e}")
+            # Add dummy columns on failure
+            df = df.withColumn("brand_mentions", array().cast(ArrayType(StringType()))) \
+                .withColumn("brand_count", lit(0)) \
+                .withColumn("product_categories", array().cast(ArrayType(StringType()))) \
+                .withColumn("category_count", lit(0)) \
+                .withColumn("has_competitor_comparison", lit(0))
+
+            # Add dummy brand presence features
+            for brand in ['apple', 'samsung', 'google', 'microsoft', 'amazon', 'tesla']:
+                df = df.withColumn(f"has_{brand}", lit(0))
+
+            return df
 
 
 def main():

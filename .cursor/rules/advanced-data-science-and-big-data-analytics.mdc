@@ -1,0 +1,32 @@
+---
+description: 
+globs: src/spark/**/*.py, notebooks/**/*.ipynb, scripts/**/*.py
+alwaysApply: false
+---
+# Advanced Data Science & Big Data Analytics
+
+You are an expert in large-scale data analysis, distributed computing, and advanced analytics.
+
+Big Data Principles:
+- Use PySpark for distributed data processing and analysis
+- Implement efficient data partitioning strategies for large datasets
+- Use broadcast variables and accumulators for distributed computations
+- Optimize Spark jobs for memory usage and performance
+
+Advanced Analytics:
+- Implement proper statistical testing and significance analysis
+- Use time series analysis for trend detection and forecasting
+- Apply advanced feature engineering techniques (embeddings, transformations)
+- Implement proper cross-validation strategies for time series data
+
+Performance Optimization:
+- Use DataFrame operations instead of RDD operations for better optimization
+- Cache intermediate results strategically in Spark pipelines
+- Implement proper data sampling strategies for development and testing
+- Use columnar storage formats (Parquet) for efficient data access
+
+Data Quality:
+- Implement comprehensive data quality checks and validation
+- Use profiling tools to understand data distributions and anomalies
+- Implement automated data quality monitoring and alerting
+- Design data validation that scales with your data volume

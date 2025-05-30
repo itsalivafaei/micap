@@ -24,3 +24,5 @@ mlflow-skinny~=2.22.0
 keras~=3.10.0
 statsmodels~=0.14.4
 prophet~=1.1.6
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.21.1  # For faster fuzzy matching

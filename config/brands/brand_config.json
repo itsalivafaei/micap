@@ -4,30 +4,628 @@
       "brands": [
         {
           "name": "Apple",
-          "aliases": ["AAPL", "iPhone", "iPad", "Mac", "MacBook"],
-          "competitors": ["Samsung", "Google", "Microsoft"],
-          "products": ["iPhone", "iPad", "MacBook", "AirPods", "Apple Watch"],
-          "keywords": ["ios", "macos", "apple store", "tim cook"]
+          "aliases": [
+            "AAPL",
+            "apple inc",
+            "apple inc.",
+            "apple computer",
+            "cupertino",
+            "iphone",
+            "ipad",
+            "macbook",
+            "imac"
+          ],
+          "products": [
+            "iPhone",
+            "iPad",
+            "MacBook",
+            "iMac",
+            "Apple Watch",
+            "AirPods",
+            "HomePod",
+            "Apple TV",
+            "Mac Pro",
+            "Mac Mini",
+            "MacBook Air",
+            "MacBook Pro",
+            "Apple Pencil",
+            "Magic Keyboard",
+            "Magic Mouse"
+          ],
+          "keywords": [
+            "innovation",
+            "design",
+            "premium",
+            "ecosystem",
+            "ios",
+            "macos",
+            "app store",
+            "itunes",
+            "siri",
+            "face id",
+            "touch id",
+            "retina",
+            "m1",
+            "m2",
+            "m3",
+            "a17",
+            "bionic"
+          ],
+          "competitors": [
+            "Samsung",
+            "Google",
+            "Microsoft",
+            "Huawei",
+            "OnePlus",
+            "Xiaomi"
+          ]
         },
         {
           "name": "Samsung",
-          "aliases": ["Galaxy", "Samsung Electronics"],
-          "competitors": ["Apple", "Google", "Xiaomi"],
-          "products": ["Galaxy S", "Galaxy Note", "Galaxy Tab", "Galaxy Watch"],
-          "keywords": ["android", "samsung pay", "one ui"]
+          "aliases": [
+            "samsung electronics",
+            "samsung group",
+            "galaxy",
+            "note",
+            "fold",
+            "flip"
+          ],
+          "products": [
+            "Galaxy S",
+            "Galaxy Note",
+            "Galaxy A",
+            "Galaxy Fold",
+            "Galaxy Flip",
+            "Galaxy Watch",
+            "Galaxy Buds",
+            "Galaxy Tab",
+            "Samsung TV",
+            "QLED",
+            "Neo QLED",
+            "The Frame",
+            "Odyssey",
+            "SSD"
+          ],
+          "keywords": [
+            "android",
+            "display",
+            "technology",
+            "innovation",
+            "amoled",
+            "oled",
+            "knox",
+            "bixby",
+            "one ui",
+            "dex",
+            "s pen",
+            "ultrasonic",
+            "fast charging",
+            "wireless charging"
+          ],
+          "competitors": [
+            "Apple",
+            "Google",
+            "Huawei",
+            "OnePlus",
+            "Xiaomi",
+            "LG"
+          ]
+        },
+        {
+          "name": "Google",
+          "aliases": [
+            "Alphabet",
+            "GOOGL",
+            "GOOG",
+            "android",
+            "pixel",
+            "chromebook",
+            "nest"
+          ],
+          "products": [
+            "Pixel",
+            "Pixel Pro",
+            "Pixel Fold",
+            "Pixel Watch",
+            "Pixel Buds",
+            "Chromebook",
+            "Chromecast",
+            "Nest Hub",
+            "Nest Mini",
+            "Nest Cam",
+            "Nest Thermostat",
+            "Google Home",
+            "Stadia"
+          ],
+          "keywords": [
+            "search",
+            "ai",
+            "cloud",
+            "machine learning",
+            "tensorflow",
+            "assistant",
+            "chrome",
+            "gmail",
+            "maps",
+            "youtube",
+            "play store",
+            "material design",
+            "pure android",
+            "computational photography"
+          ],
+          "competitors": [
+            "Apple",
+            "Microsoft",
+            "Amazon",
+            "Samsung",
+            "Meta"
+          ]
+        },
+        {
+          "name": "Microsoft",
+          "aliases": [
+            "MSFT",
+            "redmond",
+            "surface",
+            "xbox",
+            "windows"
+          ],
+          "products": [
+            "Surface Pro",
+            "Surface Laptop",
+            "Surface Book",
+            "Surface Studio",
+            "Xbox Series X",
+            "Xbox Series S",
+            "Xbox One",
+            "HoloLens",
+            "Windows",
+            "Office 365",
+            "Teams",
+            "Azure"
+          ],
+          "keywords": [
+            "productivity",
+            "enterprise",
+            "cloud computing",
+            "office suite",
+            "gaming",
+            "mixed reality",
+            "copilot",
+            "bing",
+            "edge",
+            "windows 11",
+            "directx",
+            "cortana"
+          ],
+          "competitors": [
+            "Apple",
+            "Google",
+            "Amazon",
+            "Sony",
+            "Slack"
+          ]
+        },
+        {
+          "name": "Meta",
+          "aliases": [
+            "META",
+            "facebook",
+            "instagram",
+            "whatsapp",
+            "oculus",
+            "quest"
+          ],
+          "products": [
+            "Quest",
+            "Quest Pro",
+            "Ray-Ban Stories",
+            "Portal",
+            "Facebook",
+            "Instagram",
+            "WhatsApp",
+            "Messenger",
+            "Threads",
+            "Workplace"
+          ],
+          "keywords": [
+            "social media",
+            "virtual reality",
+            "metaverse",
+            "vr",
+            "ar",
+            "mixed reality",
+            "social networking",
+            "messaging",
+            "reality labs",
+            "horizon"
+          ],
+          "competitors": [
+            "Apple",
+            "Google",
+            "TikTok",
+            "Snapchat",
+            "Twitter",
+            "LinkedIn"
+          ]
+        },
+        {
+          "name": "Amazon",
+          "aliases": [
+            "AMZN",
+            "aws",
+            "alexa",
+            "echo",
+            "kindle",
+            "fire"
+          ],
+          "products": [
+            "Echo",
+            "Echo Dot",
+            "Echo Show",
+            "Fire TV",
+            "Fire Tablet",
+            "Kindle",
+            "Ring",
+            "Blink",
+            "eero",
+            "Amazon Prime",
+            "AWS"
+          ],
+          "keywords": [
+            "e-commerce",
+            "cloud services",
+            "voice assistant",
+            "smart home",
+            "streaming",
+            "logistics",
+            "marketplace",
+            "prime",
+            "delivery",
+            "alexa skills"
+          ],
+          "competitors": [
+            "Google",
+            "Microsoft",
+            "Apple",
+            "Walmart",
+            "Netflix"
+          ]
+        },
+        {
+          "name": "Tesla",
+          "aliases": [
+            "TSLA",
+            "model s",
+            "model 3",
+            "model x",
+            "model y",
+            "cybertruck"
+          ],
+          "products": [
+            "Model S",
+            "Model 3",
+            "Model X",
+            "Model Y",
+            "Cybertruck",
+            "Semi",
+            "Roadster",
+            "Powerwall",
+            "Solar Roof",
+            "Supercharger"
+          ],
+          "keywords": [
+            "electric vehicle",
+            "ev",
+            "autonomous driving",
+            "autopilot",
+            "fsd",
+            "clean energy",
+            "solar",
+            "battery",
+            "sustainable transport",
+            "elon musk"
+          ],
+          "competitors": [
+            "BMW",
+            "Mercedes",
+            "Audi",
+            "Ford",
+            "GM",
+            "Rivian"
+          ]
+        },
+        {
+          "name": "Netflix",
+          "aliases": [
+            "NFLX",
+            "streaming",
+            "binge watch",
+            "netflix original"
+          ],
+          "products": [
+            "Netflix Originals",
+            "Netflix Mobile",
+            "Netflix Kids",
+            "Netflix Games"
+          ],
+          "keywords": [
+            "streaming",
+            "entertainment",
+            "original content",
+            "binge watching",
+            "series",
+            "movies",
+            "documentaries",
+            "algorithm",
+            "recommendation engine"
+          ],
+          "competitors": [
+            "Disney+",
+            "Amazon Prime Video",
+            "HBO Max",
+            "Hulu",
+            "Apple TV+",
+            "Paramount+"
+          ]
+        },
+        {
+          "name": "Nvidia",
+          "aliases": [
+            "NVDA",
+            "geforce",
+            "rtx",
+            "gtx",
+            "cuda",
+            "tensor"
+          ],
+          "products": [
+            "GeForce RTX",
+            "GeForce GTX",
+            "Quadro",
+            "Tesla",
+            "Drive",
+            "Jetson",
+            "Shield TV",
+            "Omniverse"
+          ],
+          "keywords": [
+            "graphics card",
+            "gpu",
+            "ai computing",
+            "machine learning",
+            "ray tracing",
+            "dlss",
+            "gaming",
+            "data center",
+            "autonomous vehicles"
+          ],
+          "competitors": [
+            "AMD",
+            "Intel",
+            "Apple",
+            "Qualcomm"
+          ]
+        },
+        {
+          "name": "AMD",
+          "aliases": [
+            "advanced micro devices",
+            "ryzen",
+            "radeon",
+            "epyc",
+            "threadripper"
+          ],
+          "products": [
+            "Ryzen",
+            "Radeon",
+            "EPYC",
+            "Threadripper",
+            "Athlon",
+            "FX",
+            "APU"
+          ],
+          "keywords": [
+            "processor",
+            "cpu",
+            "gpu",
+            "performance",
+            "value",
+            "gaming",
+            "workstation",
+            "server",
+            "chipset"
+          ],
+          "competitors": [
+            "Intel",
+            "Nvidia",
+            "Apple",
+            "Qualcomm"
+          ]
         }
       ]
     },
     "automotive": {
       "brands": [
         {
-          "name": "Tesla",
-          "aliases": ["TSLA", "Tesla Motors"],
-          "competitors": ["Ford", "GM", "Rivian", "Lucid"],
-          "products": ["Model S", "Model 3", "Model X", "Model Y", "Cybertruck"],
-          "keywords": ["elon musk", "autopilot", "supercharger", "electric vehicle"]
+          "name": "BMW",
+          "aliases": [
+            "bayerische motoren werke",
+            "beemer",
+            "bimmer",
+            "3 series",
+            "5 series",
+            "x3",
+            "x5"
+          ],
+          "products": [
+            "3 Series",
+            "5 Series",
+            "7 Series",
+            "X3",
+            "X5",
+            "X7",
+            "i3",
+            "i4",
+            "iX",
+            "M3",
+            "M5",
+            "Z4"
+          ],
+          "keywords": [
+            "luxury",
+            "performance",
+            "driving dynamics",
+            "ultimate driving machine",
+            "german engineering",
+            "premium",
+            "sport sedan",
+            "suv"
+          ],
+          "competitors": [
+            "Mercedes",
+            "Audi",
+            "Tesla",
+            "Lexus",
+            "Cadillac"
+          ]
+        },
+        {
+          "name": "Mercedes",
+          "aliases": [
+            "mercedes-benz",
+            "benz",
+            "merc",
+            "c class",
+            "e class",
+            "s class",
+            "gle",
+            "gls"
+          ],
+          "products": [
+            "C-Class",
+            "E-Class",
+            "S-Class",
+            "GLE",
+            "GLS",
+            "GLC",
+            "A-Class",
+            "CLA",
+            "AMG",
+            "Maybach",
+            "EQS",
+            "EQC"
+          ],
+          "keywords": [
+            "luxury",
+            "elegance",
+            "comfort",
+            "safety",
+            "innovation",
+            "german engineering",
+            "premium",
+            "sophistication"
+          ],
+          "competitors": [
+            "BMW",
+            "Audi",
+            "Tesla",
+            "Lexus",
+            "Genesis"
+          ]
         }
       ]
+    },
+    "retail": {
+      "brands": [
+        {
+          "name": "Walmart",
+          "aliases": [
+            "WMT",
+            "wal-mart",
+            "walmart supercenter",
+            "great value",
+            "equate"
+          ],
+          "products": [
+            "Great Value",
+            "Equate",
+            "Mainstays",
+            "Ozark Trail",
+            "Parent's Choice",
+            "Walmart+",
+            "Grocery Pickup",
+            "Walmart Pay"
+          ],
+          "keywords": [
+            "everyday low prices",
+            "value",
+            "convenience",
+            "grocery",
+            "supercenter",
+            "rollback",
+            "save money live better"
+          ],
+          "competitors": [
+            "Amazon",
+            "Target",
+            "Costco",
+            "Kroger",
+            "Best Buy"
+          ]
+        },
+        {
+          "name": "Target",
+          "aliases": [
+            "TGT",
+            "bullseye",
+            "tar-zhay",
+            "good & gather",
+            "up & up"
+          ],
+          "products": [
+            "Good & Gather",
+            "Up & Up",
+            "Cat & Jack",
+            "Goodfellow & Co",
+            "Universal Thread",
+            "Brightroom",
+            "Threshold"
+          ],
+          "keywords": [
+            "style",
+            "design",
+            "affordable luxury",
+            "trendy",
+            "bullseye",
+            "expect more pay less",
+            "designer collaborations"
+          ],
+          "competitors": [
+            "Walmart",
+            "Amazon",
+            "Costco",
+            "Macy's",
+            "Kohl's"
+          ]
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "fuzzy_threshold": 70,
+    "exact_threshold": 95,
+    "case_sensitive": false,
+    "enable_aliases": true,
+    "enable_products": true,
+    "enable_keywords": true,
+    "max_brand_mentions_per_text": 5,
+    "similarity_algorithm": "ratio",
+    "preprocessing": {
+      "remove_punctuation": true,
+      "lowercase": true,
+      "remove_stopwords": false,
+      "lemmatize": false
     }
   }
 }
