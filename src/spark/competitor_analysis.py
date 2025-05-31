@@ -675,10 +675,24 @@ class CompetitorAnalyzer:
         
         # Helper function for safe float conversion
         def safe_float(value):
-            try:
-                return float(value) if value is not None else 0.0
-            except:
+            """Safely convert value to float, handling None and string values."""
+            if value is None:
                 return 0.0
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return 0.0
+                
+        def safe_row_get(row, column_name, default_value=None):
+            """Safely get value from Spark Row, with default fallback."""
+            try:
+                if hasattr(row, column_name):
+                    value = getattr(row, column_name, default_value)
+                    return value if value is not None else default_value
+                else:
+                    return default_value
+            except:
+                return default_value
                 
         # Get overall metrics
         brand_data = df.filter(col("brand") == target_brand_lower)
@@ -709,15 +723,15 @@ class CompetitorAnalyzer:
             insights["metrics"]["current"] = {
                 "sentiment_score": safe_float(latest_data["sentiment_score"]),
                 "mention_count": int(latest_data["mention_count"] or 0),
-                "positive_ratio": safe_float(latest_data.get("positive_ratio", 0)),
-                "market_position": latest_data.get("market_position", "Unknown")
+                "positive_ratio": safe_float(safe_row_get(latest_data, "positive_ratio", 0)),
+                "market_position": safe_row_get(latest_data, "market_position", "Unknown")
             }
             
             # Add market position to insights for revised pipeline compatibility
             insights["insights"]["market_position"] = {
-                "share_of_voice": safe_float(latest_data.get("share_of_voice", 0)),
+                "share_of_voice": safe_float(safe_row_get(latest_data, "share_of_voice", 0)),
                 "sentiment_score": safe_float(latest_data["sentiment_score"]),
-                "market_rank": int(latest_data.get("sov_rank", 0))
+                "market_rank": int(safe_row_get(latest_data, "sov_rank", 0))
             }
             
         # Trend analysis
@@ -725,10 +739,10 @@ class CompetitorAnalyzer:
             trend_data = brand_data.orderBy(desc("window_start")).first()
             if trend_data:
                 insights["trends"] = {
-                    "momentum": safe_float(trend_data.get("sentiment_momentum", 0)),
-                    "trend_direction": trend_data.get("momentum_trend", "unknown"),
-                    "trend_signal": trend_data.get("momentum_signal", "neutral"),
-                    "projected_sentiment": safe_float(trend_data.get("projected_sentiment", 0))
+                    "momentum": safe_float(safe_row_get(trend_data, "sentiment_momentum", 0)),
+                    "trend_direction": safe_row_get(trend_data, "momentum_trend", "unknown"),
+                    "trend_signal": safe_row_get(trend_data, "momentum_signal", "neutral"),
+                    "projected_sentiment": safe_float(safe_row_get(trend_data, "projected_sentiment", 0))
                 }
                 
         # Competitor analysis - use provided list or auto-detect

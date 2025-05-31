@@ -9,17 +9,18 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-from src.utils.path_utils import get_path
+import logging
 
+# Add project root to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
+# Now import local modules
+from src.utils.path_utils import get_path
 from config.spark_config import create_spark_session
 from src.ml.sentiment_models import (
     NaiveBayesModel, LogisticRegressionModel,
     RandomForestModel, GradientBoostingModel
 )
-
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

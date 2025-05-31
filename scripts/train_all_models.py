@@ -133,7 +133,7 @@ def generate_performance_report(traditional_results, dl_results, cv_results):
 2. For production use, consider ensemble methods combining top models
 3. Deep learning models show promise but require more data for optimal performance
 """.format(
-        traditional_results.to_string(),
+        str(traditional_results),
         cv_results['cv_best_score'],
         [f"{s:.4f}" for s in cv_results['cv_scores']],
         dl_results['LSTM']['accuracy'],
@@ -173,6 +173,8 @@ def main():
         dl_results = train_deep_learning_models(spark, sample_size=1.0)
         # dl_results = deep_learning_models_results(spark, sample_size=1.0)
 
+        
+        
         # Generate report
         report = generate_performance_report(traditional_results, dl_results, cv_results)
 
