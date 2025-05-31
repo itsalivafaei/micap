@@ -16,7 +16,7 @@ metastore_db/
 derby.log
 
 # Data
-#/data/
+/data/
 data/raw/*
 #data/processed/*
 #!data/raw/.gitkeep

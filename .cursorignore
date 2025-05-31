@@ -16,7 +16,6 @@ __pycache__/
 .DS_Store
 
 # ignore logs and artifacts
-logs/
 artifacts/
 src/ml/artifacts/
 src/spark/artifacts/

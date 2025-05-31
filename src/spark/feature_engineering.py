@@ -6,6 +6,7 @@ FIXED: Uses lazy imports to avoid serialization issues with Spark workers
 
 import logging
 import math
+import os
 from typing import List, Dict, Optional, Tuple
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql.functions import (
@@ -199,81 +200,105 @@ class FeatureEngineer:
                     .withColumn(f"{n}gram_count", lit(0))
             return df
 
-    def generate_word_embeddings(self, df: DataFrame,
-                                 tokens_col: str = "tokens_lemmatized",
-                                 vector_size: int = 100) -> DataFrame:
+    def generate_word_embeddings_optimized(self, df: DataFrame,
+                                         tokens_col: str = "tokens_lemmatized",
+                                         vector_size: int = 100) -> DataFrame:
         """
-        Generate Word2Vec embeddings with lazy imports and small dataset handling
+        Generate Word2Vec embeddings with memory optimization and checkpointing
         """
-        logger.info(f"Generating Word2Vec embeddings with size {vector_size}...")
+        logger.info(f"Generating optimized Word2Vec embeddings with size {vector_size}...")
 
         ml_imports = self._lazy_import_ml_features()
         if ml_imports is None:
             logger.error("Could not import ML features. Using dummy embeddings.")
-            dummy_vector = [0.0] * vector_size
-            return df.withColumn("word2vec_features",
-                                 lit(dummy_vector).cast(ArrayType(DoubleType())))
+            return self._create_dummy_embeddings(df, vector_size)
 
         Word2Vec = ml_imports['Word2Vec']
-
-        # Check dataset size and vocabulary
+        
+        # Cache the dataframe to avoid recomputation
+        df.cache()
         row_count = df.count()
         logger.info(f"Dataset has {row_count} rows")
 
         try:
-            # Count unique words to estimate vocabulary size
-            all_tokens = df.select(explode(col(tokens_col)).alias("word"))
-            unique_word_count = all_tokens.distinct().count()
-            logger.info(f"Estimated vocabulary size: {unique_word_count} unique words")
+            # Checkpoint the data to disk to break lineage
+            checkpoint_dir = str(get_path("data/checkpoints/word2vec"))
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            self.spark.sparkContext.setCheckpointDir(checkpoint_dir)
+            
+            # Filter and checkpoint data
+            df_filtered = df.filter(size(col(tokens_col)) > 0)
+            df_filtered.checkpoint()
+            
+            # Count vocabulary more efficiently
+            vocab_sample = df_filtered.sample(0.1).select(explode(col(tokens_col)).alias("word"))
+            estimated_vocab = vocab_sample.distinct().count() * 10
+            logger.info(f"Estimated vocabulary size: {estimated_vocab} unique words")
 
-            # Adjust minCount based on dataset size
-            if row_count < 10:
-                adjusted_min_count = 1
-            elif row_count < 100:
-                adjusted_min_count = 2
+            # Dynamic parameter adjustment based on data size
+            if row_count < 100:
+                min_count = 1
+                max_iter = 3
+                window_size = 3
+            elif row_count < 1000:
+                min_count = 2
+                max_iter = 5
+                window_size = 4
             else:
-                adjusted_min_count = self.min_word_count
+                min_count = max(2, row_count // 1000)
+                max_iter = min(10, max(3, row_count // 100))
+                window_size = 5
 
-            logger.info(f"Using minCount = {adjusted_min_count} for Word2Vec")
+            logger.info(f"Word2Vec params: minCount={min_count}, maxIter={max_iter}, windowSize={window_size}")
 
-            # Check if we have qualifying words
-            word_freq = all_tokens.groupBy("word").count()
-            qualifying_words = word_freq.filter(col("count") >= adjusted_min_count).count()
-
-            if qualifying_words == 0:
-                logger.warning("No words meet minCount requirement. Using dummy embeddings.")
-                dummy_vector = [0.0] * vector_size
-                return df.withColumn("word2vec_features",
-                                     lit(dummy_vector).cast(ArrayType(DoubleType())))
-
-            logger.info(f"{qualifying_words} words qualify for Word2Vec training")
-
-            # Configure Word2Vec
+            # Create Word2Vec with optimized parameters
             word2vec = Word2Vec(
                 vectorSize=vector_size,
-                minCount=adjusted_min_count,
+                minCount=min_count,
                 inputCol=tokens_col,
                 outputCol="word2vec_features",
-                windowSize=min(5, max(2, row_count // 2)),
-                maxIter=max(1, min(10, row_count)),
-                seed=42
+                windowSize=window_size,
+                maxIter=max_iter,
+                seed=42,
+                numPartitions=4,  # Reduce parallelism to save memory
+                stepSize=0.025    # Smaller step size for stability
             )
 
-            # Fit and transform
-            model = word2vec.fit(df)
-            df_w2v = model.transform(df)
-
-            # Log success
-            word_vectors = model.getVectors()
-            logger.info(f"Learned vectors for {word_vectors.count()} words")
-            logger.info("Word2Vec generation completed")
-            return df_w2v
+            # Train with retry logic
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Word2Vec training attempt {attempt + 1}/{max_retries}")
+                    model = word2vec.fit(df_filtered)
+                    df_w2v = model.transform(df_filtered)
+                    
+                    # Verify success
+                    word_vectors = model.getVectors()
+                    vector_count = word_vectors.count()
+                    logger.info(f"Successfully learned vectors for {vector_count} words")
+                    
+                    # Unpersist cached data
+                    df.unpersist()
+                    return df_w2v
+                    
+                except Exception as e:
+                    logger.warning(f"Word2Vec attempt {attempt + 1} failed: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    # Force garbage collection and try again
+                    import gc
+                    gc.collect()
 
         except Exception as e:
-            logger.warning(f"Word2Vec training failed: {e}. Using dummy embeddings.")
-            dummy_vector = [0.0] * vector_size
-            return df.withColumn("word2vec_features",
-                                 lit(dummy_vector).cast(ArrayType(DoubleType())))
+            logger.warning(f"Word2Vec training failed after all attempts: {e}. Using dummy embeddings.")
+            df.unpersist()
+            return self._create_dummy_embeddings(df, vector_size)
+
+    def _create_dummy_embeddings(self, df: DataFrame, vector_size: int) -> DataFrame:
+        """Create dummy zero embeddings when Word2Vec fails"""
+        dummy_vector = [0.0] * vector_size
+        return df.withColumn("word2vec_features",
+                             lit(dummy_vector).cast(ArrayType(DoubleType())))
 
     def extract_lexicon_features(self, df: DataFrame,
                                  text_col: str = "text") -> DataFrame:
@@ -414,7 +439,7 @@ class FeatureEngineer:
             df = self.extract_entity_features(df)  # Add this line
             df = self.extract_ngram_features(df)
             df = self.create_tfidf_features(df, num_features=self.tfidf_features)
-            df = self.generate_word_embeddings(df, vector_size=self.word2vec_size)
+            df = self.generate_word_embeddings_optimized(df, vector_size=self.word2vec_size)
 
             # Update feature summary to include entity features
             feature_cols = [
@@ -632,6 +657,39 @@ class FeatureEngineer:
                 df = df.withColumn(f"has_{brand}", lit(0))
 
             return df
+
+    def can_train_word2vec(self, df: DataFrame, tokens_col: str = "tokens_lemmatized") -> bool:
+        """
+        Check if Word2Vec training is feasible given memory constraints
+        """
+        try:
+            # Get system info
+            import psutil
+            available_memory_gb = psutil.virtual_memory().available / (1024**3)
+            
+            # Sample data to estimate requirements
+            sample_df = df.sample(0.01).select(tokens_col)
+            sample_count = sample_df.count()
+            
+            if sample_count == 0:
+                return False
+            
+            # Estimate vocabulary size from sample
+            vocab_sample = sample_df.select(explode(col(tokens_col)).alias("word"))
+            unique_words_sample = vocab_sample.distinct().count()
+            estimated_vocab = unique_words_sample * 100  # Scale up
+            
+            # Rough memory estimation (vocab_size * vector_size * 8 bytes * safety_factor)
+            estimated_memory_gb = (estimated_vocab * 100 * 8 * 3) / (1024**3)
+            
+            logger.info(f"Available memory: {available_memory_gb:.1f}GB")
+            logger.info(f"Estimated Word2Vec memory needed: {estimated_memory_gb:.1f}GB")
+            
+            return estimated_memory_gb < available_memory_gb * 0.7  # 70% safety margin
+            
+        except Exception as e:
+            logger.warning(f"Could not estimate Word2Vec feasibility: {e}")
+            return True  # Default to trying
 
 
 def main():

@@ -135,6 +135,17 @@ def create_spark_session(app_name: str,
     conf.set("spark.network.timeout", "300s")
     conf.set("spark.executor.heartbeatInterval", "20s")
     
+    # Word2Vec specific optimizations
+    conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "1000")  # Reduce batch size
+    conf.set("spark.sql.shuffle.partitions", "100")  # Reduce from 200
+    conf.set("spark.driver.maxResultSize", "4g")     # Increase result size
+    conf.set("spark.executor.memory", "6g")          # Increase executor memory
+    conf.set("spark.executor.memoryFraction", "0.8") # More memory for execution
+    conf.set("spark.storage.memoryFraction", "0.6")  # More storage memory
+    conf.set("spark.rdd.compress", "true")           # Enable RDD compression
+    conf.set("spark.network.timeout", "600s")        # Increase network timeout
+    conf.set("spark.executor.heartbeatInterval", "60s") # Increase heartbeat
+    
     # Create session
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
     

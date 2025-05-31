@@ -196,10 +196,6 @@ def run_pipeline(sample_fraction: float = 0.01,
     
     try:
         spark = create_spark_session("Phase1_Pipeline_Enhanced")
-        # Set additional configurations for stability
-        spark.conf.set("spark.sql.adaptive.enabled", "true")
-        spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        spark.conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         logger.info("✓ Spark session created successfully")
     except Exception as e:
         error_msg = f"Failed to create Spark session: {e}"

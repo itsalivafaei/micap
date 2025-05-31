@@ -17,7 +17,7 @@ from pyspark.sql.functions import (
     col, lower, regexp_replace, trim, split, array_distinct, array_join,
     udf, when, length, expr, size, regexp_extract_all, lit
 )
-from pyspark.sql.types import StringType, ArrayType, IntegerType
+from pyspark.sql.types import StringType, ArrayType, IntegerType, StructType, StructField, FloatType
 
 # No external dependencies - emoji and spacy removed
 
@@ -321,8 +321,18 @@ class TextPreprocessor:
                 return ["unknown", 0.0]
 
         # Register the UDF
-        from pyspark.sql.types import ArrayType, DoubleType
-        self.detect_language_udf = udf(detect_language_basic, ArrayType(DoubleType()))
+        # Change to return a struct instead of array to handle mixed types properly
+        def detect_language_wrapper(text):
+            result = detect_language_basic(text)
+            return (result[0], float(result[1]))  # (language_string, confidence_float)
+        
+        # Use StructType to handle mixed types properly
+        language_struct = StructType([
+            StructField("language", StringType(), True),
+            StructField("confidence", FloatType(), True)
+        ])
+        
+        self.detect_language_udf = udf(detect_language_wrapper, language_struct)
 
     def clean_text(self, df: DataFrame, text_col: str = "text") -> DataFrame:
         """
@@ -465,8 +475,8 @@ class TextPreprocessor:
         )
 
         # Extract language code and confidence
-        df = df.withColumn("detected_language", col("lang_detection")[0]) \
-            .withColumn("language_confidence", col("lang_detection")[1]) \
+        df = df.withColumn("detected_language", col("lang_detection.language")) \
+            .withColumn("language_confidence", col("lang_detection.confidence")) \
             .drop("lang_detection")
 
         # Log language distribution before filtering
