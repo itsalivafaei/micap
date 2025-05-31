@@ -16,11 +16,7 @@ metastore_db/
 derby.log
 
 # Data
-/data/
-data/raw/*
-#data/processed/*
-#!data/raw/.gitkeep
-#!data/processed/.gitkeep
+data/
 
 
 # Models
