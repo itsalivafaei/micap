@@ -16,14 +16,6 @@ from typing import Dict, List, Optional
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import fuzzywuzzy for optimized UDFs
-try:
-    from fuzzywuzzy import fuzz, process
-    HAS_FUZZYWUZZY = True
-except ImportError:
-    HAS_FUZZYWUZZY = False
-    print("Warning: fuzzywuzzy not available. Install with: pip install fuzzywuzzy[speedup]")
-
 from src.utils.path_utils import get_path
 from config.spark_config import create_spark_session
 from src.ml.entity_recognition import (
@@ -55,136 +47,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_optimized_brand_udf(broadcast_config):
-    """
-    Create optimized brand recognition UDF using broadcast configuration.
-    This avoids recreating the recognizer for each row.
-    """
-    from pyspark.sql.types import ArrayType, StringType
-    from pyspark.sql.functions import udf
-    from fuzzywuzzy import fuzz, process
-    
-    def optimized_brand_recognition(text):
-        if not text or not text.strip():
-            return []
-        
-        try:
-            # Get config from broadcast variable
-            config = broadcast_config.value
-            
-            # Simple but efficient brand detection using fuzzywuzzy
-            detected_brands = []
-            text_lower = text.lower()
-            
-            # Extract all brand names and aliases from config
-            brand_terms = {}
-            for industry, industry_data in config.get('industries', {}).items():
-                for brand_data in industry_data.get('brands', []):
-                    brand_name = brand_data['name']
-                    terms = [brand_name.lower()]
-                    terms.extend([alias.lower() for alias in brand_data.get('aliases', [])])
-                    
-                    for term in terms:
-                        if len(term) > 2:  # Skip very short terms
-                            brand_terms[term] = brand_name
-            
-            # Quick fuzzy matching with reasonable threshold
-            for term, brand_name in brand_terms.items():
-                if term in text_lower:
-                    # Exact match
-                    detected_brands.append(f"{brand_name}:1.00")
-                elif len(term) > 4:  # Only fuzzy match longer terms
-                    # Use fuzzywuzzy for partial matching
-                    ratio = fuzz.partial_ratio(term, text_lower)
-                    if ratio >= 80:  # High threshold for quality
-                        confidence = ratio / 100.0
-                        detected_brands.append(f"{brand_name}:{confidence:.2f}")
-            
-            # Remove duplicates and keep highest confidence
-            brand_scores = {}
-            for detection in detected_brands:
-                brand, score_str = detection.split(':')
-                score = float(score_str)
-                if brand not in brand_scores or score > brand_scores[brand]:
-                    brand_scores[brand] = score
-            
-            # Return top detections
-            result = [f"{brand}:{score:.2f}" for brand, score in brand_scores.items()]
-            return result[:5]  # Limit to top 5 brands
-            
-        except Exception as e:
-            # Log error but don't fail the entire job
-            return []
-    
-    return udf(optimized_brand_recognition, ArrayType(StringType()))
-
-
-def create_optimized_product_udf(broadcast_config):
-    """
-    Create optimized product extraction UDF using broadcast configuration.
-    """
-    from pyspark.sql.types import ArrayType, StringType
-    from pyspark.sql.functions import udf
-    from fuzzywuzzy import fuzz
-    
-    def optimized_product_extraction(text):
-        if not text or not text.strip():
-            return []
-        
-        try:
-            # Get config from broadcast variable
-            config = broadcast_config.value
-            
-            detected_products = []
-            text_lower = text.lower()
-            
-            # Extract all products from config
-            product_terms = {}
-            for industry, industry_data in config.get('industries', {}).items():
-                for brand_data in industry_data.get('brands', []):
-                    brand_name = brand_data['name']
-                    for product in brand_data.get('products', []):
-                        if len(product) > 3:  # Skip very short product names
-                            product_terms[product.lower()] = (product, brand_name)
-            
-            # Quick product matching
-            for term, (product_name, brand_name) in product_terms.items():
-                if term in text_lower:
-                    # Exact match
-                    detected_products.append(f"{product_name}|{brand_name}:1.00")
-                elif len(term) > 5:  # Only fuzzy match longer product names
-                    ratio = fuzz.partial_ratio(term, text_lower)
-                    if ratio >= 85:  # High threshold for products
-                        confidence = ratio / 100.0
-                        detected_products.append(f"{product_name}|{brand_name}:{confidence:.2f}")
-            
-            # Remove duplicates
-            unique_products = list(set(detected_products))
-            return unique_products[:3]  # Limit to top 3 products
-            
-        except Exception as e:
-            return []
-    
-    return udf(optimized_product_extraction, ArrayType(StringType()))
-
-
-def monitor_udf_progress(df, operation_name):
-    """
-    Monitor UDF execution progress with periodic logging.
-    """
-    logger.info(f"Starting {operation_name}...")
-    start_time = time.time()
-    
-    # Force evaluation with progress monitoring
-    result_df = df.cache()
-    count = result_df.count()
-    
-    elapsed = time.time() - start_time
-    logger.info(f"✓ {operation_name} completed: {count} records in {elapsed:.2f}s")
-    
-    return result_df
-
-
 def run_phase2_pipeline(sample_size: float = 0.1):
     """
     Run complete Phase 2 pipeline: Brand Recognition and Competitor Analysis
@@ -192,34 +54,14 @@ def run_phase2_pipeline(sample_size: float = 0.1):
     Args:
         sample_size: Fraction of data to process (0.1 = 10%)
     """
-    # Check dependencies first
-    if not HAS_FUZZYWUZZY:
-        logger.error("fuzzywuzzy is required for Phase 2 pipeline")
-        logger.error("Install with: pip install fuzzywuzzy[speedup]")
-        raise ImportError("fuzzywuzzy is required but not available")
-    
     start_time = time.time()
     logger.info("=" * 60)
     logger.info("Starting Phase 2 Pipeline - Brand Recognition & Competitor Analysis")
     logger.info("=" * 60)
     
-    # Create Spark session with optimized configuration
+    # Create Spark session
     logger.info("Initializing Spark session...")
-    spark = create_spark_session(
-        app_name="Phase2_Pipeline",
-        environment="development",  # Will use optimized development config
-        enable_adaptive=True,       # Enable adaptive query execution
-        enable_arrow=True          # Enable Arrow for better UDF performance
-    )
-    
-    # Additional runtime configurations (only those that can be modified after creation)
-    try:
-        spark.conf.set("spark.sql.adaptive.enabled", "true")
-        spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        logger.info("Runtime optimizations applied successfully")
-    except Exception as e:
-        logger.warning(f"Some runtime configurations could not be applied: {e}")
-        # Continue execution - these are optimizations, not requirements
+    spark = create_spark_session("Phase2_Pipeline")
     
     try:
         # Load Phase 1 processed data
@@ -235,48 +77,28 @@ def run_phase2_pipeline(sample_size: float = 0.1):
         sample_count = df_sample.cache().count()
         logger.info(f"Processing {sample_count} records ({sample_size*100:.1f}% sample)")
         
-        # Optimize partitioning for better performance
-        optimal_partitions = max(4, min(sample_count // 1000, 200))
-        df_sample = df_sample.repartition(optimal_partitions)
-        logger.info(f"Repartitioned data into {optimal_partitions} partitions")
-        
         # ========================================
-        # STEP 1: Brand/Entity Recognition (Optimized)
+        # STEP 1: Brand/Entity Recognition
         # ========================================
         logger.info("\n" + "=" * 50)
-        logger.info("STEP 1: Brand/Entity Recognition (Optimized)")
+        logger.info("STEP 1: Brand/Entity Recognition")
         logger.info("=" * 50)
         
-        # Create optimized UDFs with broadcasting
-        logger.info("Creating optimized UDFs with broadcasting...")
+        # Initialize entity recognition components
         config_path = str(get_path("config/brands/brand_config.json"))
+        brand_recognizer = BrandRecognizer(config_path)
+        product_extractor = ProductExtractor(brand_recognizer)
         
-        # Load configuration once and broadcast it
-        with open(config_path, 'r') as f:
-            brand_config = json.load(f)
+        # Create UDFs for distributed processing
+        brand_udf = create_brand_recognition_udf(config_path)
+        product_udf = create_product_extraction_udf(config_path)
         
-        # Broadcast the configuration to all workers
-        broadcast_config = spark.sparkContext.broadcast(brand_config)
-        logger.info("Brand configuration broadcasted to all workers")
-        
-        # Create optimized UDFs
-        brand_udf = create_optimized_brand_udf(broadcast_config)
-        product_udf = create_optimized_product_udf(broadcast_config)
-        
-        # Process in batches to avoid memory issues
-        batch_size = 10000
-        total_batches = (sample_count + batch_size - 1) // batch_size
-        logger.info(f"Processing {total_batches} batches of {batch_size} records each")
-        
-        # Apply brand recognition in batches
+        # Apply brand recognition
         logger.info("Recognizing brands in tweets...")
         df_brands = df_sample.withColumn(
             "detected_brands",
             brand_udf(col("text"))
         )
-        
-        # Monitor progress and cache intermediate result
-        df_brands = monitor_udf_progress(df_brands, "Brand Recognition")
         
         # Apply product extraction
         logger.info("Extracting product mentions...")
@@ -284,9 +106,6 @@ def run_phase2_pipeline(sample_size: float = 0.1):
             "detected_products",
             product_udf(col("text"))
         )
-        
-        # Monitor progress and force evaluation
-        df_entities = monitor_udf_progress(df_entities, "Product Extraction")
         
         # Filter to records with detected entities
         df_with_entities = df_entities.filter(
@@ -318,10 +137,7 @@ def run_phase2_pipeline(sample_size: float = 0.1):
         logger.info("STEP 2: Competitor Analysis")
         logger.info("=" * 50)
         
-        # Initialize competitor analyzer with minimal brand recognizer
-        # Create a lightweight brand recognizer for competitor analysis
-        config_path = str(get_path("config/brands/brand_config.json"))
-        brand_recognizer = BrandRecognizer(config_path, use_spacy=False)
+        # Initialize competitor analyzer
         competitor_analyzer = CompetitorAnalyzer(spark, brand_recognizer)
         
         # Prepare data for competitor analysis - rename column for compatibility
@@ -485,25 +301,11 @@ def run_phase2_pipeline(sample_size: float = 0.1):
         logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
         raise
     finally:
-        # Clean up broadcast variables and cached DataFrames
+        # Clean up
         try:
-            if 'broadcast_config' in locals():
-                broadcast_config.unpersist()
-                logger.info("Broadcast variables cleaned up")
+            df_sample.unpersist()
         except:
             pass
-        
-        try:
-            if 'df_sample' in locals():
-                df_sample.unpersist()
-            if 'df_brands' in locals():
-                df_brands.unpersist()
-            if 'df_entities' in locals():
-                df_entities.unpersist()
-            logger.info("Cached DataFrames cleaned up")
-        except:
-            pass
-        
         spark.stop()
         logger.info("Spark session closed")
 

@@ -317,7 +317,7 @@ class TrendForecaster:
         Forecast overall sentiment trends
 
         Args:
-            df: Spark DataFrame with sentiment data (from competitor analysis)
+            df: Spark DataFrame with sentiment data
             horizon: Forecast horizon in days
             granularity: Time granularity (hourly/daily)
 
@@ -326,44 +326,21 @@ class TrendForecaster:
         """
         logger.info("Forecasting overall sentiment trends")
 
-        # Check if the input DataFrame has the expected columns
-        has_window_start = "window_start" in df.columns
-        has_sentiment_score = "sentiment_score" in df.columns
-        has_timestamp = "timestamp" in df.columns
-        has_sentiment = "sentiment" in df.columns
-        
-        if has_window_start and has_sentiment_score:
-            # Input is already aggregated (from competitor analysis)
-            agg_df = df.groupBy("window_start").agg(
-                avg("sentiment_score").alias("avg_sentiment"),
-                count("*").alias("tweet_count"),
-                avg("avg_vader_compound").alias("avg_compound") if "avg_vader_compound" in df.columns else lit(0.0).alias("avg_compound")
-            ).select("window_start", "avg_sentiment", "tweet_count", "avg_compound")
-        elif has_timestamp and has_sentiment:
-            # Input is raw tweet data - need to aggregate
-            time_window = "1 hour" if granularity == "hourly" else "1 day"
-            agg_df = df.groupBy(
-                window("timestamp", time_window)
-            ).agg(
-                avg("sentiment").alias("avg_sentiment"),
-                count("*").alias("tweet_count"),
-                avg("vader_compound").alias("avg_compound") if "vader_compound" in df.columns else lit(0.0).alias("avg_compound")
-            ).withColumn(
-                "window_start", col("window.start")
-            ).select("window_start", "avg_sentiment", "tweet_count", "avg_compound")
-        else:
-            logger.warning(f"Unexpected DataFrame schema. Columns: {df.columns}")
-            # Return empty DataFrame with schema
-            return self.spark.createDataFrame([],
-                                              "window_start: timestamp, forecast: double, lower: double, upper: double")
+        # Aggregate sentiment by time window
+        time_window = "1 hour" if granularity == "hourly" else "1 day"
+
+        agg_df = df.groupBy(
+            window("timestamp", time_window)
+        ).agg(
+            avg("sentiment").alias("avg_sentiment"),
+            count("*").alias("tweet_count"),
+            avg("vader_compound").alias("avg_compound")
+        ).withColumn(
+            "window_start", col("window.start")
+        ).select("window_start", "avg_sentiment", "tweet_count", "avg_compound")
 
         # Convert to pandas for Prophet
-        try:
-            pdf = agg_df.toPandas()
-        except Exception as e:
-            logger.error(f"Failed to convert to pandas: {e}")
-            return self.spark.createDataFrame([],
-                                              "window_start: timestamp, forecast: double, lower: double, upper: double")
+        pdf = agg_df.toPandas()
 
         # Forecast sentiment
         sentiment_df = pdf[['window_start', 'avg_sentiment']].rename(
@@ -371,32 +348,26 @@ class TrendForecaster:
         )
 
         if len(sentiment_df) > 10:  # Need minimum data
-            try:
-                model = Prophet(
-                    daily_seasonality=True,
-                    weekly_seasonality=True,
-                    changepoint_prior_scale=0.05
-                )
-                model.fit(sentiment_df)
+            model = Prophet(
+                daily_seasonality=True,
+                weekly_seasonality=True,
+                changepoint_prior_scale=0.05
+            )
+            model.fit(sentiment_df)
 
-                future = model.make_future_dataframe(periods=horizon)
-                forecast = model.predict(future)
+            future = model.make_future_dataframe(periods=horizon)
+            forecast = model.predict(future)
 
-                # Convert back to Spark DataFrame
-                forecast_df = self.spark.createDataFrame(
-                    forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
-                ).withColumnRenamed('ds', 'window_start') \
-                    .withColumnRenamed('yhat', 'forecast') \
-                    .withColumnRenamed('yhat_lower', 'lower') \
-                    .withColumnRenamed('yhat_upper', 'upper')
+            # Convert back to Spark DataFrame
+            forecast_df = self.spark.createDataFrame(
+                forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+            ).withColumnRenamed('ds', 'window_start') \
+                .withColumnRenamed('yhat', 'forecast') \
+                .withColumnRenamed('yhat_lower', 'lower') \
+                .withColumnRenamed('yhat_upper', 'upper')
 
-                return forecast_df
-            except Exception as e:
-                logger.error(f"Prophet forecasting failed: {e}")
-                return self.spark.createDataFrame([],
-                                                  "window_start: timestamp, forecast: double, lower: double, upper: double")
+            return forecast_df
         else:
-            logger.warning(f"Insufficient data for forecasting: {len(sentiment_df)} records")
             # Return empty DataFrame with schema
             return self.spark.createDataFrame([],
                                               "window_start: timestamp, forecast: double, lower: double, upper: double")
@@ -509,50 +480,21 @@ class AnomalyDetector:
         self.models = {}
 
     def detect_sentiment_anomalies(self, df: DataFrame,
-                                   features: List[str] = None) -> DataFrame:
+                                   features: List[str]) -> DataFrame:
         """
         Detect anomalies in sentiment patterns
 
         Args:
             df: DataFrame with sentiment data
-            features: Features to use for anomaly detection (auto-detected if None)
+            features: Features to use for anomaly detection
 
         Returns:
             DataFrame with anomaly labels
         """
         logger.info("Detecting sentiment anomalies")
 
-        # Auto-detect features if not provided
-        if features is None:
-            available_columns = df.columns
-            potential_features = [
-                "sentiment_score", "mention_count", "positive_ratio", 
-                "negative_ratio", "avg_sentiment", "sentiment_stddev",
-                "share_of_voice", "sov_rank", "sentiment_momentum"
-            ]
-            features = [col for col in potential_features if col in available_columns]
-            
-            if not features:
-                logger.warning("No suitable features found for anomaly detection")
-                return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
-            
-            logger.info(f"Auto-detected features for anomaly detection: {features}")
-
-        # Check if required columns exist
-        required_columns = ["window_start", "brand"] if "window_start" in df.columns else ["timestamp", "brand"]
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        
-        if missing_columns:
-            logger.warning(f"Missing required columns: {missing_columns}")
-            return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
-
         # Convert to pandas for sklearn
-        try:
-            select_columns = features + required_columns
-            pdf = df.select(select_columns).toPandas()
-        except Exception as e:
-            logger.error(f"Failed to convert to pandas: {e}")
-            return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
+        pdf = df.select(features + ["window_start", "brand"]).toPandas()
 
         # Group by brand for brand-specific models
         anomalies_list = []
@@ -588,11 +530,7 @@ class AnomalyDetector:
             result_df = pd.concat(anomalies_list, ignore_index=True)
 
             # Convert back to Spark
-            try:
-                return self.spark.createDataFrame(result_df)
-            except Exception as e:
-                logger.error(f"Failed to convert back to Spark: {e}")
-                return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
+            return self.spark.createDataFrame(result_df)
         else:
             return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
 

@@ -23,10 +23,7 @@ scripts/artifacts/
 notebooks/artifacts/
 
 # ignore data directories
-# data/
-*.crc
-*.h5
-# *.parquet
+data/
 
 # ignore test outputs
 temp_test.py
