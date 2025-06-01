@@ -1,23 +1,28 @@
-.PHONY: help install test lint format docs clean build deploy
+.PHONY: help install test lint format docs clean build deploy validate-deps
 
 help:
 	@echo "MICAP - Market Intelligence & Competitor Analysis Platform"
 	@echo "Available commands:"
-	@echo "  install     - Install dependencies and setup environment"
-	@echo "  test        - Run all tests"
-	@echo "  lint        - Run code linting and formatting checks"
-	@echo "  format      - Format code with black and isort"
-	@echo "  docs        - Generate documentation"
-	@echo "  clean       - Clean temporary files and caches"
-	@echo "  build       - Build Docker image"
-	@echo "  deploy      - Deploy using docker-compose"
+	@echo "  install        - Install dependencies and setup environment"
+	@echo "  validate-deps  - Validate that all dependencies install and import correctly"
+	@echo "  test           - Run all tests"
+	@echo "  lint           - Run code linting and formatting checks"
+	@echo "  format         - Format code with black and isort"
+	@echo "  docs           - Generate documentation"
+	@echo "  clean          - Clean temporary files and caches"
+	@echo "  build          - Build Docker image"
+	@echo "  deploy         - Deploy using docker-compose"
 
 install:
-	python -m pip install --upgrade pip
+	python -m pip install --upgrade pip setuptools wheel
+	pip install cython
 	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
 	python -m spacy download en_core_web_sm
 	pre-commit install
+
+validate-deps:
+	python scripts/validate_dependencies.py
 
 test:
 	pytest tests/ --cov=src --cov-report=html --cov-report=term-missing -v

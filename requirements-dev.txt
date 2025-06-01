@@ -1,5 +1,8 @@
 # Development and Testing Dependencies for MICAP
 
+# Build dependencies
+cython>=3.0.0  # Required for building some dependencies like PyYAML
+
 # Testing frameworks
 pytest>=7.4.0
 pytest-cov>=4.1.0

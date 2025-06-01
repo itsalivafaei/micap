@@ -26,3 +26,4 @@ statsmodels~=0.14.4
 prophet~=1.1.6
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.21.1  # For faster fuzzy matching
+PyYAML>=6.0.2  # Ensure Python 3.11 compatibility
