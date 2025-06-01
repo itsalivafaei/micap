@@ -229,20 +229,54 @@ def run_pipeline(sample_fraction: float = 0.01,
                     else:
                         raise FileNotFoundError("No dataset found for processing")
                 
-                # Load and validate data
+                # Load and validate data - but prioritize balanced sampling for Sentiment140
                 logger.info(f"Loading data from: {data_path}")
-                df_raw = ingestion.load_sentiment140_data(data_path)
-                total_records = df_raw.count()
-                logger.info(f"Loaded {total_records:,} total records")
                 
-                # Validate data quality
-                df_clean, quality_metrics = ingestion.validate_data_quality(df_raw)
-                logger.info(f"Data quality validation completed")
-                
-                # Create sample for processing
-                df_sample = ingestion.create_sample_dataset(df_clean, sample_size=sample_fraction)
-                sample_count = df_sample.count()
-                logger.info(f"Created sample with {sample_count:,} records")
+                # Use balanced sampling directly if this is the full training dataset
+                if "training.1600000.processed.noemoticon.csv" in data_path:
+                    logger.info("Detected Sentiment140 training dataset - using balanced sampling")
+                    try:
+                        df_sample = ingestion.create_balanced_sample_from_full_dataset(data_path, sample_size=sample_fraction)
+                        sample_count = df_sample.count()
+                        logger.info(f"✓ Balanced sample created with {sample_count:,} records")
+                        
+                        # Verify class distribution
+                        class_dist = df_sample.groupBy("sentiment").count().collect()
+                        logger.info("Sample class distribution:")
+                        for row in class_dist:
+                            logger.info(f"  Class {row['sentiment']}: {row['count']} records")
+                        
+                        if len(class_dist) < 2:
+                            raise ValueError("Balanced sampling failed to get both classes")
+                        
+                        # Set total_records for checkpoint metadata
+                        total_records = 1600000  # Known size of Sentiment140
+                        
+                    except Exception as balanced_error:
+                        logger.warning(f"⚠️  Balanced sampling failed: {balanced_error}")
+                        logger.info("Falling back to standard approach...")
+                        df_raw = ingestion.load_sentiment140_data(data_path)
+                        total_records = df_raw.count()
+                        logger.info(f"Loaded {total_records:,} total records")
+                        
+                        df_clean, quality_metrics = ingestion.validate_data_quality(df_raw)
+                        logger.info(f"Data quality validation completed")
+                        
+                        df_sample = ingestion.create_sample_dataset(df_clean, sample_size=sample_fraction)
+                        sample_count = df_sample.count()
+                        logger.info(f"Fallback sample created with {sample_count:,} records")
+                else:
+                    # For other datasets (like test data), use standard approach
+                    df_raw = ingestion.load_sentiment140_data(data_path)
+                    total_records = df_raw.count()
+                    logger.info(f"Loaded {total_records:,} total records")
+                    
+                    df_clean, quality_metrics = ingestion.validate_data_quality(df_raw)
+                    logger.info(f"Data quality validation completed")
+                    
+                    df_sample = ingestion.create_sample_dataset(df_clean, sample_size=sample_fraction)
+                    sample_count = df_sample.count()
+                    logger.info(f"Created sample with {sample_count:,} records")
                 
                 # Save sample data with better error handling
                 try:
