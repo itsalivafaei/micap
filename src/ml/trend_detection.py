@@ -649,96 +649,96 @@ class ViralityPredictor:
 
         return df_viral
 
-    # def calculate_virality_score(self, df: DataFrame) -> DataFrame:
-    #     """
-    #     Calculate virality potential score
-    #
-    #     Args:
-    #         df: DataFrame with tweet data
-    #
-    #     Returns:
-    #         DataFrame with virality scores
-    #     """
-    #     logger.info("Calculating virality scores")
-    #
-    #     # Define virality features
-    #     df = df.withColumn(
-    #         "engagement_score",
-    #         (col("retweet_count") * 2 + col("favorite_count")) /
-    #         (col("follower_count") + 1)  # Normalize by followers
-    #     )
-    #
-    #     # Text features that correlate with virality
-    #     df = df.withColumn(
-    #         "has_hashtag",
-    #         when(size(col("hashtags")) > 0, 1).otherwise(0)
-    #     ).withColumn(
-    #         "has_mention",
-    #         when(col("text").contains("@"), 1).otherwise(0)
-    #     ).withColumn(
-    #         "has_url",
-    #         when(col("text").contains("http"), 1).otherwise(0)
-    #     )
-    #
-    #     # Sentiment extremity (very positive/negative tends to go viral)
-    #     df = df.withColumn(
-    #         "sentiment_extremity",
-    #         spark_abs(col("vader_compound"))
-    #     )
-    #
-    #     # Calculate virality score
-    #     df = df.withColumn(
-    #         "virality_score",
-    #         (
-    #                 col("engagement_score") * 0.4 +
-    #                 col("sentiment_extremity") * 0.2 +
-    #                 col("has_hashtag") * 0.15 +
-    #                 col("has_mention") * 0.15 +
-    #                 col("has_url") * 0.1
-    #         )
-    #     )
-    #
-    #     # Classify virality potential
-    #     df = df.withColumn(
-    #         "virality_potential",
-    #         when(col("virality_score") > 0.8, "high")
-    #         .when(col("virality_score") > 0.5, "medium")
-    #         .otherwise("low")
-    #     )
-    #
-    #     return df
+    def calculate_virality_score(self, df: DataFrame) -> DataFrame:
+        """
+        Calculate virality potential score
 
-    # def identify_viral_topics(self, df: DataFrame,
-    #                           threshold: float = 0.7) -> DataFrame:
-    #     """
-    #     Identify topics with viral potential
-    #
-    #     Args:
-    #         df: DataFrame with topic and virality data
-    #         threshold: Virality score threshold
-    #
-    #     Returns:
-    #         DataFrame of viral topics
-    #     """
-    #     logger.info("Identifying viral topics")
-    #
-    #     # Filter high virality content
-    #     viral_df = df.filter(col("virality_score") > threshold)
-    #
-    #     # Aggregate by topic
-    #     viral_topics = viral_df.groupBy("dominant_topic").agg(
-    #         count("*").alias("viral_count"),
-    #         avg("virality_score").alias("avg_virality_score"),
-    #         collect_list("text").alias("sample_texts")
-    #     )
-    #
-    #     # Limit sample texts
-    #     viral_topics = viral_topics.withColumn(
-    #         "sample_texts",
-    #         expr("slice(sample_texts, 1, 5)")
-    #     )
-    #
-    #     return viral_topics.orderBy(desc("viral_count"))
+        Args:
+            df: DataFrame with tweet data
+
+        Returns:
+            DataFrame with virality scores
+        """
+        logger.info("Calculating virality scores")
+
+        # Define virality features
+        df = df.withColumn(
+            "engagement_score",
+            (col("retweet_count") * 2 + col("favorite_count")) /
+            (col("follower_count") + 1)  # Normalize by followers
+        )
+
+        # Text features that correlate with virality
+        df = df.withColumn(
+            "has_hashtag",
+            when(size(col("hashtags")) > 0, 1).otherwise(0)
+        ).withColumn(
+            "has_mention",
+            when(col("text").contains("@"), 1).otherwise(0)
+        ).withColumn(
+            "has_url",
+            when(col("text").contains("http"), 1).otherwise(0)
+        )
+
+        # Sentiment extremity (very positive/negative tends to go viral)
+        df = df.withColumn(
+            "sentiment_extremity",
+            spark_abs(col("vader_compound"))
+        )
+
+        # Calculate virality score
+        df = df.withColumn(
+            "virality_score",
+            (
+                    col("engagement_score") * 0.4 +
+                    col("sentiment_extremity") * 0.2 +
+                    col("has_hashtag") * 0.15 +
+                    col("has_mention") * 0.15 +
+                    col("has_url") * 0.1
+            )
+        )
+
+        # Classify virality potential
+        df = df.withColumn(
+            "virality_potential",
+            when(col("virality_score") > 0.8, "high")
+            .when(col("virality_score") > 0.5, "medium")
+            .otherwise("low")
+        )
+
+        return df
+
+    def identify_viral_topics(self, df: DataFrame,
+                              threshold: float = 0.7) -> DataFrame:
+        """
+        Identify topics with viral potential
+
+        Args:
+            df: DataFrame with topic and virality data
+            threshold: Virality score threshold
+
+        Returns:
+            DataFrame of viral topics
+        """
+        logger.info("Identifying viral topics")
+
+        # Filter high virality content
+        viral_df = df.filter(col("virality_score") > threshold)
+
+        # Aggregate by topic
+        viral_topics = viral_df.groupBy("dominant_topic").agg(
+            count("*").alias("viral_count"),
+            avg("virality_score").alias("avg_virality_score"),
+            collect_list("text").alias("sample_texts")
+        )
+
+        # Limit sample texts
+        viral_topics = viral_topics.withColumn(
+            "sample_texts",
+            expr("slice(sample_texts, 1, 5)")
+        )
+
+        return viral_topics.orderBy(desc("viral_count"))
 
 
 # Main function for testing
@@ -802,7 +802,7 @@ def main():
     for col_name in ["retweet_count", "favorite_count", "follower_count"]:
         if col_name not in df_virality.columns:
             df_virality = df_virality.withColumn(col_name, lit(0))
-
+            
     virality_df = virality_predictor.calculate_virality_score(df_virality)
     logger.info(f"Calculated virality scores for {virality_df.count()} tweets")
 
