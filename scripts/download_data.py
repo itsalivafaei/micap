@@ -1,7 +1,7 @@
 """
 Script to download and prepare the Sentiment140 dataset
-Handles download, extraction, and initial data validation
-"""
+Handles download, extraction, and initial data validation.
+."""
 
 import os
 import wget
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 def download_sentiment140():
     """
     Download Sentiment140 dataset from Stanford
-    The dataset contains 1.6 million labeled tweets
-    """
+    The dataset contains 1.6 million labeled tweets.
+    ."""
 
     # Create data directory if it doesn't exist
     data_dir = Path("/Users/ali/Documents/Projects/micap/data/raw")

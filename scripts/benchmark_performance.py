@@ -1,7 +1,7 @@
 """
 Performance benchmarking for scalability analysis
-Tests models with increasing data sizes
-"""
+Tests models with increasing data sizes.
+."""
 
 import os
 import sys
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 def benchmark_models(spark, data_sizes=[0.01, 0.05, 0.1, 0.2]):
     """
-    Benchmark model performance with different data sizes
-    """
+    Benchmark model performance with different data sizes.
+    ."""
     logger.info("Starting performance benchmarking...")
 
     # Load full dataset
@@ -113,7 +113,7 @@ def benchmark_models(spark, data_sizes=[0.01, 0.05, 0.1, 0.2]):
 
 
 def visualize_benchmarks(results_df):
-    """Create benchmark visualizations"""
+    """Create benchmark visualizations."""
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
@@ -171,7 +171,7 @@ def visualize_benchmarks(results_df):
 
 
 def main():
-    """Run benchmarking"""
+    """Run benchmarking."""
     spark = create_spark_session("Benchmarking")
 
     # Run benchmarks

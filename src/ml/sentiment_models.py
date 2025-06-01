@@ -1,6 +1,6 @@
-"""
-Sentiment Analysis Models for MICAP - FIXED VERSION
-Fixed Naive Bayes compatibility and feature scaling issues
+"""Sentiment Analysis Models for MICAP.
+
+Fixed Naive Bayes compatibility and feature scaling issues.
 """
 
 import time
@@ -39,18 +39,17 @@ logger = logging.getLogger(__name__)
 
 
 class BaseModel(ABC):
-    """
-    Abstract base class for sentiment analysis models
-    Provides common functionality for all models
+    """Abstract base class for sentiment analysis models.
+    
+    Provides common functionality for all models.
     """
 
     def __init__(self, spark: SparkSession, model_name: str):
-        """
-        Initialize base model
+        """Initialize base model.
 
         Args:
-            spark: Active SparkSession
-            model_name: Name of the model
+            spark: Active SparkSession.
+            model_name: Name of the model.
         """
         self.spark = spark
         self.model_name = model_name
@@ -60,19 +59,18 @@ class BaseModel(ABC):
 
     @abstractmethod
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build the model pipeline"""
+        """Build the model pipeline."""
         pass
 
     def prepare_features(self, df: DataFrame, feature_cols: List[str]) -> DataFrame:
-        """
-        Prepare features for model training with model-specific scaling
+        """Prepare features for model training with model-specific scaling.
 
         Args:
-            df: Input DataFrame
-            feature_cols: List of feature column names
+            df: Input DataFrame.
+            feature_cols: List of feature column names.
 
         Returns:
-            DataFrame with assembled features
+            DataFrame with assembled features.
         """
         logger.info(f"Preparing features for {self.model_name}")
 
@@ -122,15 +120,14 @@ class BaseModel(ABC):
         return df_prepared
 
     def train(self, train_df: DataFrame, feature_cols: List[str]) -> PipelineModel:
-        """
-        Train the model
+        """Train the model.
 
         Args:
-            train_df: Training DataFrame
-            feature_cols: List of feature columns
+            train_df: Training DataFrame.
+            feature_cols: List of feature columns.
 
         Returns:
-            Trained PipelineModel
+            Trained PipelineModel.
         """
         start_time = time.time()
         logger.info(f"Training {self.model_name}...")
@@ -151,15 +148,14 @@ class BaseModel(ABC):
         return self.model
 
     def evaluate(self, test_df: DataFrame, feature_cols: List[str]) -> Dict[str, float]:
-        """
-        Evaluate the model on test data
+        """Evaluate the model on test data.
 
         Args:
-            test_df: Test DataFrame
-            feature_cols: List of feature columns
+            test_df: Test DataFrame.
+            feature_cols: List of feature columns.
 
         Returns:
-            Dictionary of evaluation metrics
+            Dictionary of evaluation metrics.
         """
         logger.info(f"Evaluating {self.model_name}...")
 
@@ -202,291 +198,233 @@ class BaseModel(ABC):
         )
 
         # Calculate metrics
-        self.metrics['auc'] = binary_evaluator.evaluate(predictions)
-        self.metrics['accuracy'] = accuracy_evaluator.evaluate(predictions)
-        self.metrics['precision'] = precision_evaluator.evaluate(predictions)
-        self.metrics['recall'] = recall_evaluator.evaluate(predictions)
-        self.metrics['f1'] = f1_evaluator.evaluate(predictions)
+        auc = binary_evaluator.evaluate(predictions)
+        accuracy = accuracy_evaluator.evaluate(predictions)
+        precision = precision_evaluator.evaluate(predictions)
+        recall = recall_evaluator.evaluate(predictions)
+        f1 = f1_evaluator.evaluate(predictions)
 
-        # Confusion matrix
-        confusion_matrix = predictions.groupBy("label", "prediction").count().toPandas()
-        self.metrics['confusion_matrix'] = confusion_matrix
+        # Store results
+        metrics = {
+            'accuracy': accuracy,
+            'auc': auc,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1
+        }
 
-        logger.info(f"{self.model_name} evaluation completed")
-        logger.info(f"Accuracy: {self.metrics['accuracy']:.4f}")
-        logger.info(f"F1 Score: {self.metrics['f1']:.4f}")
+        self.metrics.update(metrics)
+        logger.info(f"{self.model_name} evaluation: "
+                   f"Accuracy={accuracy:.4f}, AUC={auc:.4f}, F1={f1:.4f}")
 
-        return self.metrics
+        return metrics
 
     def cross_validate(self, df: DataFrame, feature_cols: List[str],
-                       num_folds: int = 5) -> Dict[str, float]:
-        """
-        Perform cross-validation
+                      num_folds: int = 5) -> Dict[str, float]:
+        """Perform cross-validation.
 
         Args:
-            df: Input DataFrame
-            feature_cols: List of feature columns
-            num_folds: Number of cross-validation folds
+            df: Input DataFrame.
+            feature_cols: List of feature columns.
+            num_folds: Number of folds for cross-validation.
 
         Returns:
-            Cross-validation metrics
+            Dictionary of cross-validation metrics.
         """
-        logger.info(f"Performing {num_folds}-fold cross-validation for {self.model_name}")
+        logger.info(f"Starting {num_folds}-fold cross-validation for {self.model_name}")
 
         # Prepare features
         df_prepared = self.prepare_features(df, feature_cols)
 
-        # Build model pipeline
+        # Build pipeline
         pipeline = self.build_model(feature_cols)
 
-        # Set up cross-validator
-        evaluator = MulticlassClassificationEvaluator(
+        # Create evaluator
+        evaluator = BinaryClassificationEvaluator(
             labelCol="label",
-            predictionCol="prediction",
-            metricName="f1"
+            rawPredictionCol="rawPrediction",
+            metricName="areaUnderROC"
         )
 
+        # Create parameter grid
+        param_grid = self._get_param_grid()
+
+        # Cross-validator
         cv = CrossValidator(
             estimator=pipeline,
-            estimatorParamMaps=self._get_param_grid(),
+            estimatorParamMaps=param_grid,
             evaluator=evaluator,
             numFolds=num_folds,
             seed=42
         )
 
-        # Perform cross-validation
+        # Fit cross-validator
         start_time = time.time()
         cv_model = cv.fit(df_prepared)
         cv_time = time.time() - start_time
 
-        # Get results
-        avg_metrics = cv_model.avgMetrics
-        best_metric = max(avg_metrics)
+        # Get best metrics
+        best_score = max(cv_model.avgMetrics)
 
-        self.metrics['cv_scores'] = avg_metrics
-        self.metrics['cv_best_score'] = best_metric
-        self.metrics['cv_time'] = cv_time
-        self.metrics['best_params'] = cv_model.bestModel.stages[-1].extractParamMap()
+        cv_metrics = {
+            'cv_auc': best_score,
+            'cv_time': cv_time,
+            'num_folds': num_folds
+        }
 
-        logger.info(f"Cross-validation completed in {cv_time:.2f} seconds")
-        logger.info(f"Best F1 score: {best_metric:.4f}")
-
-        return self.metrics
+        logger.info(f"Cross-validation completed: AUC={best_score:.4f}")
+        return cv_metrics
 
     @abstractmethod
     def _get_param_grid(self):
-        """Get parameter grid for cross-validation"""
+        """Get parameter grid for hyperparameter tuning."""
         pass
 
 
 class NaiveBayesModel(BaseModel):
-    """
-    Naive Bayes classifier for sentiment analysis - FIXED for non-negative features
-    """
+    """Naive Bayes model for sentiment analysis."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize Naive Bayes model."""
         super().__init__(spark, "Naive Bayes")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build Naive Bayes pipeline with Gaussian model type"""
-
-        # Use Gaussian Naive Bayes which can handle any real-valued features
-        # or use multinomial with proper feature scaling
-        nb = NaiveBayes(
-            labelCol="label",
-            featuresCol="features",
-            smoothing=1.0,
-            modelType="gaussian"  # Changed from "multinomial" to "gaussian"
-        )
-
-        # Create pipeline
-        pipeline = Pipeline(stages=[nb])
-
-        return pipeline
+        """Build Naive Bayes model pipeline."""
+        nb = NaiveBayes(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[nb])
 
     def _get_param_grid(self):
-        """Parameter grid for Naive Bayes"""
-        nb = NaiveBayes()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(nb.smoothing, [0.5, 1.0, 2.0]) \
+        """Get parameter grid for Naive Bayes."""
+        param_grid = ParamGridBuilder() \
+            .addGrid(NaiveBayes.smoothing, [0.1, 1.0, 2.0]) \
             .build()
-        return paramGrid
+        return param_grid
 
 
 class LogisticRegressionModel(BaseModel):
-    """
-    Logistic Regression with ElasticNet regularization
-    """
+    """Logistic Regression model for sentiment analysis."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize Logistic Regression model."""
         super().__init__(spark, "Logistic Regression")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build Logistic Regression pipeline"""
-
-        lr = LogisticRegression(
-            labelCol="label",
-            featuresCol="features",
-            maxIter=100,
-            regParam=0.01,
-            elasticNetParam=0.5,
-            family="binomial"
-        )
-
-        pipeline = Pipeline(stages=[lr])
-        return pipeline
+        """Build Logistic Regression model pipeline."""
+        lr = LogisticRegression(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[lr])
 
     def _get_param_grid(self):
-        """Parameter grid for Logistic Regression"""
-        lr = LogisticRegression()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(lr.regParam, [0.001, 0.01, 0.1]) \
-            .addGrid(lr.elasticNetParam, [0.0, 0.5, 1.0]) \
+        """Get parameter grid for Logistic Regression."""
+        param_grid = ParamGridBuilder() \
+            .addGrid(LogisticRegression.regParam, [0.01, 0.1, 1.0]) \
+            .addGrid(LogisticRegression.elasticNetParam, [0.0, 0.5, 1.0]) \
             .build()
-        return paramGrid
+        return param_grid
 
 
 class RandomForestModel(BaseModel):
-    """
-    Random Forest classifier
-    """
+    """Random Forest model for sentiment analysis."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize Random Forest model."""
         super().__init__(spark, "Random Forest")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build Random Forest pipeline"""
-
-        rf = RandomForestClassifier(
-            labelCol="label",
-            featuresCol="features",
-            numTrees=100,
-            maxDepth=10,
-            seed=42,
-            subsamplingRate=0.8,
-            featureSubsetStrategy="sqrt"
-        )
-
-        pipeline = Pipeline(stages=[rf])
-        return pipeline
+        """Build Random Forest model pipeline."""
+        rf = RandomForestClassifier(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[rf])
 
     def _get_param_grid(self):
-        """Parameter grid for Random Forest"""
-        rf = RandomForestClassifier()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(rf.numTrees, [50, 100]) \
-            .addGrid(rf.maxDepth, [5, 10]) \
+        """Get parameter grid for Random Forest."""
+        param_grid = ParamGridBuilder() \
+            .addGrid(RandomForestClassifier.numTrees, [10, 20, 50]) \
+            .addGrid(RandomForestClassifier.maxDepth, [5, 10, 15]) \
             .build()
-        return paramGrid
+        return param_grid
 
 
 class GradientBoostingModel(BaseModel):
-    """
-    Gradient Boosting Trees classifier
-    """
+    """Gradient Boosting model for sentiment analysis."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize Gradient Boosting model."""
         super().__init__(spark, "Gradient Boosting")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build Gradient Boosting pipeline"""
-
-        gbt = GBTClassifier(
-            labelCol="label",
-            featuresCol="features",
-            maxIter=50,
-            maxDepth=5,
-            seed=42,
-            subsamplingRate=0.8,
-            stepSize=0.1
-        )
-
-        pipeline = Pipeline(stages=[gbt])
-        return pipeline
+        """Build Gradient Boosting model pipeline."""
+        gbt = GBTClassifier(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[gbt])
 
     def _get_param_grid(self):
-        """Parameter grid for GBT"""
-        gbt = GBTClassifier()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(gbt.maxDepth, [3, 5]) \
-            .addGrid(gbt.stepSize, [0.1, 0.2]) \
+        """Get parameter grid for Gradient Boosting."""
+        param_grid = ParamGridBuilder() \
+            .addGrid(GBTClassifier.maxIter, [10, 20]) \
+            .addGrid(GBTClassifier.maxDepth, [5, 10]) \
             .build()
-        return paramGrid
+        return param_grid
 
 
 class SVMModel(BaseModel):
-    """
-    Support Vector Machine (Linear SVC)
-    """
+    """Support Vector Machine (SVM) model for sentiment analysis."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize SVM model."""
         super().__init__(spark, "SVM")
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build SVM pipeline"""
-
-        svm = LinearSVC(
-            labelCol="label",
-            featuresCol="features",
-            maxIter=100,
-            regParam=0.01,
-            standardization=True
-        )
-
-        pipeline = Pipeline(stages=[svm])
-        return pipeline
+        """Build SVM model pipeline."""
+        svm = LinearSVC(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[svm])
 
     def _get_param_grid(self):
-        """Parameter grid for SVM"""
-        svm = LinearSVC()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(svm.regParam, [0.001, 0.01, 0.1]) \
+        """Get parameter grid for SVM."""
+        param_grid = ParamGridBuilder() \
+            .addGrid(LinearSVC.regParam, [0.01, 0.1, 1.0]) \
             .build()
-        return paramGrid
+        return param_grid
 
 
 class EnsembleModel(BaseModel):
-    """
-    Ensemble of multiple models
-    """
+    """Ensemble model combining multiple algorithms."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize Ensemble model."""
         super().__init__(spark, "Ensemble")
-        self.base_models = []
 
     def build_model(self, feature_cols: List[str]) -> Pipeline:
-        """Build ensemble pipeline"""
-
-        # Use Random Forest as the main model for the ensemble
-        rf = RandomForestClassifier(numTrees=50, maxDepth=5, seed=42)
-        pipeline = Pipeline(stages=[rf])
-        return pipeline
+        """Build Ensemble model pipeline."""
+        # For simplicity, use a single model wrapped in OneVsRest
+        lr = LogisticRegression(featuresCol="features", labelCol="label")
+        return Pipeline(stages=[lr])
 
     def _get_param_grid(self):
-        """Parameter grid for ensemble"""
-        rf = RandomForestClassifier()
-        paramGrid = ParamGridBuilder() \
-            .addGrid(rf.numTrees, [50, 100]) \
-            .build()
-        return paramGrid
+        """Get parameter grid for Ensemble."""
+        return ParamGridBuilder().build()
 
 
 class ModelEvaluator:
-    """
-    Comprehensive model evaluation and comparison
-    """
+    """Utility class for evaluating and comparing multiple models."""
 
     def __init__(self, spark: SparkSession):
+        """Initialize ModelEvaluator."""
         self.spark = spark
-        self.results = {}
+        self.results = []
 
     def evaluate_all_models(self, train_df: DataFrame, test_df: DataFrame,
-                            feature_cols: List[str]) -> pd.DataFrame:
-        """
-        Evaluate all models and compare results
+                           feature_cols: List[str]) -> pd.DataFrame:
+        """Evaluate all available sentiment models.
+
+        Args:
+            train_df: Training DataFrame.
+            test_df: Test DataFrame.
+            feature_cols: List of feature columns.
+
+        Returns:
+            DataFrame with comparison results.
         """
         logger.info("Starting comprehensive model evaluation...")
 
+        # Initialize all models
         models = [
             NaiveBayesModel(self.spark),
             LogisticRegressionModel(self.spark),
@@ -496,134 +434,124 @@ class ModelEvaluator:
             EnsembleModel(self.spark)
         ]
 
-        for model in models:
-            logger.info(f"\n{'=' * 50}")
-            logger.info(f"Training {model.model_name}")
-            logger.info(f"{'=' * 50}")
+        results = []
 
+        for model in models:
             try:
+                logger.info(f"Evaluating {model.model_name}...")
+
                 # Train model
                 model.train(train_df, feature_cols)
 
                 # Evaluate model
                 metrics = model.evaluate(test_df, feature_cols)
 
-                # Store results
-                self.results[model.model_name] = {
-                    'accuracy': metrics['accuracy'],
-                    'precision': metrics['precision'],
-                    'recall': metrics['recall'],
-                    'f1': metrics['f1'],
-                    'auc': metrics['auc'],
-                    'training_time': metrics['training_time']
-                }
+                # Add training time
+                metrics['training_time'] = model.metrics.get('training_time', 0)
+                metrics['model_name'] = model.model_name
+
+                results.append(metrics)
 
             except Exception as e:
-                logger.error(f"Failed to train/evaluate {model.model_name}: {e}")
-                # Store placeholder results
-                self.results[model.model_name] = {
-                    'accuracy': 0.0,
-                    'precision': 0.0,
-                    'recall': 0.0,
-                    'f1': 0.0,
-                    'auc': 0.0,
-                    'training_time': 0.0
-                }
+                logger.error(f"Error evaluating {model.model_name}: {e}")
+                results.append({
+                    'model_name': model.model_name,
+                    'error': str(e),
+                    'accuracy': 0,
+                    'auc': 0,
+                    'precision': 0,
+                    'recall': 0,
+                    'f1': 0,
+                    'training_time': 0
+                })
 
-        # Create comparison DataFrame
-        comparison_df = pd.DataFrame(self.results).T
-        comparison_df = comparison_df.round(4)
+        # Convert to DataFrame
+        comparison_df = pd.DataFrame(results)
 
-        # Sort by F1 score
-        comparison_df = comparison_df.sort_values('f1', ascending=False)
+        # Sort by AUC score
+        comparison_df = comparison_df.sort_values('auc', ascending=False)
 
-        logger.info("\n" + "=" * 50)
-        logger.info("Model Comparison Results")
-        logger.info("=" * 50)
-        print(comparison_df)
-
+        logger.info("Model evaluation completed")
         return comparison_df
 
     def perform_cross_validation(self, df: DataFrame, feature_cols: List[str],
-                                 model_name: str = "Random Forest") -> Dict:
-        """
-        Perform cross-validation on selected model
+                                model_name: str = "Random Forest") -> Dict:
+        """Perform cross-validation on selected model.
+
+        Args:
+            df: Input DataFrame.
+            feature_cols: List of feature columns.
+            model_name: Name of model to validate.
+
+        Returns:
+            Cross-validation results.
         """
         logger.info(f"Performing cross-validation for {model_name}")
 
-        if model_name == "Random Forest":
-            model = RandomForestModel(self.spark)
-        elif model_name == "Logistic Regression":
-            model = LogisticRegressionModel(self.spark)
-        else:
-            model = RandomForestModel(self.spark)
+        # Initialize model
+        model_map = {
+            "Random Forest": RandomForestModel(self.spark),
+            "Logistic Regression": LogisticRegressionModel(self.spark),
+            "Naive Bayes": NaiveBayesModel(self.spark),
+            "SVM": SVMModel(self.spark)
+        }
 
-        cv_results = model.cross_validate(df, feature_cols, num_folds=5)
-        return cv_results
+        model = model_map.get(model_name, RandomForestModel(self.spark))
+        return model.cross_validate(df, feature_cols)
 
     def save_results(self, comparison_df: pd.DataFrame, output_path: str):
-        """Save evaluation results"""
-        comparison_df.to_csv(f"{output_path}/model_comparison.csv")
-        comparison_df.to_json(f"{output_path}/model_comparison.json", orient='index')
+        """Save evaluation results."""
+        comparison_df.to_csv(output_path, index=False)
         logger.info(f"Results saved to {output_path}")
 
 
 def main():
-    """
-    Demonstrate model training and evaluation
-    """
-    from config.spark_config import create_spark_session
-
+    """Main function for running sentiment model evaluation."""
     # Create Spark session
-    spark = create_spark_session("ModelTraining")
+    spark = SparkSession.builder \
+        .appName("SentimentModels") \
+        .config("spark.sql.adaptive.enabled", "true") \
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+        .getOrCreate()
 
-    # Load featured data
-    logger.info("Loading featured data...")
-    data_path = "/Users/ali/Documents/Projects/micap/data/processed/pipeline_features"
-    df = spark.read.parquet(data_path)
+    try:
+        # Load processed data
+        from ..spark.data_ingestion import DataIngestion
+        ingestion = DataIngestion(spark)
+        df = ingestion.load_sentiment140_data()
 
-    # Define feature columns
-    feature_cols = [
-        "text_length", "processed_length", "token_count",
-        "emoji_sentiment", "exclamation_count", "question_count",
-        "uppercase_ratio", "punctuation_density",
-        "vader_compound", "vader_positive", "vader_negative", "vader_neutral",
-        "hour_sin", "hour_cos", "is_weekend",
-        "2gram_count", "3gram_count"
-    ]
+        # Sample for efficiency
+        df_sample = df.sample(0.1, seed=42)
 
-    # Split data
-    train_df, test_df = df.randomSplit([0.8, 0.2], seed=42)
-    logger.info(f"Train set: {train_df.count()} records")
-    logger.info(f"Test set: {test_df.count()} records")
+        # Split data
+        train_df, test_df = df_sample.randomSplit([0.8, 0.2], seed=42)
 
-    # Cache data for faster processing
-    train_df.cache()
-    test_df.cache()
+        # Define feature columns (these should match your feature engineering output)
+        feature_cols = [
+            "text_length", "processed_length", "token_count",
+            "emoji_sentiment", "exclamation_count", "question_count",
+            "uppercase_ratio", "punctuation_density",
+            "vader_compound", "vader_positive", "vader_negative", "vader_neutral",
+            "hour_sin", "hour_cos", "is_weekend",
+            "2gram_count", "3gram_count"
+        ]
 
-    # Evaluate all models
-    evaluator = ModelEvaluator(spark)
-    comparison_df = evaluator.evaluate_all_models(train_df, test_df, feature_cols)
+        # Create evaluator
+        evaluator = ModelEvaluator(spark)
 
-    # Save results
-    output_path = "/Users/ali/Documents/Projects/micap/data/models"
-    import os
-    os.makedirs(output_path, exist_ok=True)
-    evaluator.save_results(comparison_df, output_path)
+        # Evaluate all models
+        results = evaluator.evaluate_all_models(train_df, test_df, feature_cols)
 
-    # Perform cross-validation on best model
-    logger.info("\nPerforming cross-validation on best model...")
-    cv_results = evaluator.perform_cross_validation(
-        df.sample(0.1), feature_cols, "Random Forest"
-    )
+        # Print results
+        print("\nModel Comparison Results:")
+        print("=" * 80)
+        print(results.to_string(index=False))
 
-    logger.info(f"Cross-validation F1 scores: {cv_results['cv_scores']}")
-    logger.info(f"Best CV F1 score: {cv_results['cv_best_score']:.4f}")
+        # Save results
+        evaluator.save_results(results, "model_comparison_results.csv")
 
-    # Clean up
-    train_df.unpersist()
-    test_df.unpersist()
-    spark.stop()
+    finally:
+        spark.stop()
 
 
 if __name__ == "__main__":

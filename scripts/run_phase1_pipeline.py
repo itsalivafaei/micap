@@ -1,7 +1,7 @@
-"""
-Complete Phase 1 Pipeline Runner - ENHANCED VERSION
-Executes all data processing steps in sequence with improved error handling
-FIXED: Enhanced serialization handling and recovery mechanisms
+"""Complete Phase 1 Pipeline Runner - ENHANCED VERSION.
+
+Executes all data processing steps in sequence with improved error handling.
+FIXED: Enhanced serialization handling and recovery mechanisms.
 """
 
 import os
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Import modules with better error handling
 def safe_import(module_name: str, description: str) -> Any:
-    """Safely import modules with descriptive error handling"""
+    """Safely import modules with descriptive error handling."""
     try:
         if module_name == "config.spark_config":
             from config.spark_config import create_spark_session
@@ -86,14 +86,14 @@ except ImportError as e:
 
 
 class PipelineRecovery:
-    """Handles pipeline recovery and checkpoint management"""
+    """Handles pipeline recovery and checkpoint management."""
     
     def __init__(self, base_path: str):
         self.base_path = Path(base_path)
         self.checkpoints = {}
     
     def save_checkpoint(self, stage: str, df: Any, metadata: dict = None) -> bool:
-        """Save pipeline checkpoint"""
+        """Save pipeline checkpoint."""
         try:
             checkpoint_path = self.base_path / f"checkpoint_{stage}"
             checkpoint_path.mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ class PipelineRecovery:
             return False
     
     def load_checkpoint(self, stage: str, spark) -> Optional[Any]:
-        """Load pipeline checkpoint"""
+        """Load pipeline checkpoint."""
         try:
             if stage in self.checkpoints:
                 checkpoint_path = Path(self.checkpoints[stage])
@@ -131,7 +131,7 @@ class PipelineRecovery:
 
 
 def validate_environment() -> bool:
-    """Validate environment setup before pipeline execution"""
+    """Validate environment setup before pipeline execution."""
     logger.info("Validating environment setup...")
     
     # Check Python version
@@ -164,7 +164,7 @@ def run_pipeline(sample_fraction: float = 0.01,
         resume_from_checkpoint: Try to resume from existing checkpoints
         
     Returns:
-        Tuple of (success: bool, results: dict)
+        Tuple of (success: bool, results: dict).
     """
     start_time = time.time()
     results = {

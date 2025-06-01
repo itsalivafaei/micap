@@ -1,8 +1,8 @@
-"""
-Data Ingestion Module for MICAP
+"""Data Ingestion Module for MICAP.
+
 Handles loading, validation, and partitioning of tweet data
-Optimized for local processing on M4 Mac
-"""
+Optimized for local processing on M4 Mac.
+."""
 
 import os
 import sys
@@ -32,18 +32,13 @@ logger = logging.getLogger(__name__)
 
 
 class DataIngestion:
-    """
-    Handles data ingestion for sentiment analysis
-    Includes validation, cleaning, and partitioning
-    """
-
-    def __init__(self, spark: Optional[SparkSession] = None):
-        """
-        Initialize DataIngestion with Spark session
+    """Handles data ingestion for sentiment analysis.
+    Includes validation, cleaning, and partitioning.
+    ."""def __init__(self, spark: Optional[SparkSession] = None):."""Initialize DataIngestion with Spark session.
 
         Args:
-            spark: Optional SparkSession, creates new if not provided
-        """
+            spark: Optional SparkSession, creates new if not provided.
+        ."""
         self.spark = spark or create_spark_session("DataIngestion")
 
         # Define schema for Sentiment140 dataset
@@ -57,15 +52,14 @@ class DataIngestion:
         ])
 
     def load_sentiment140_data(self, file_path: str) -> DataFrame:
-        """
-        Load Sentiment140 dataset with proper schema and initial cleaning
+        """Load Sentiment140 dataset with proper schema and initial cleaning.
 
         Args:
             file_path: Path to the CSV file
 
         Returns:
-            DataFrame: Loaded and initially processed data
-        """
+            DataFrame: Loaded and initially processed data.
+        ."""
         logger.info(f"Loading data from: {file_path}")
 
         try:
@@ -112,15 +106,14 @@ class DataIngestion:
             raise
 
     def validate_data_quality(self, df: DataFrame) -> Tuple[DataFrame, dict]:
-        """
-        Validate data quality and return cleaned data with quality metrics
+        """Validate data quality and return cleaned data with quality metrics.
 
         Args:
             df: Input DataFrame
 
         Returns:
-            Tuple of (cleaned DataFrame, quality metrics dict)
-        """
+            Tuple of (cleaned DataFrame, quality metrics dict).
+        ."""
         logger.info("Starting data quality validation...")
 
         initial_count = df.count()
@@ -156,8 +149,7 @@ class DataIngestion:
         return df_clean, quality_metrics
 
     def partition_by_date(self, df: DataFrame, output_path: str) -> str:
-        """
-        Partition data by date for efficient processing
+        """Partition data by date for efficient processing.
         Optimized for local file system on M4 Mac
 
         Args:
@@ -165,8 +157,8 @@ class DataIngestion:
             output_path: Base path for partitioned data
 
         Returns:
-            str: Path to partitioned data
-        """
+            str: Path to partitioned data.
+        ."""
         logger.info(f"Partitioning data to: {output_path}")
 
         # For local development, we'll use fewer partitions
@@ -183,14 +175,13 @@ class DataIngestion:
         return output_path
 
     def save_to_local_storage(self, df: DataFrame, path: str, format: str = "parquet"):
-        """
-        Save DataFrame to local storage with optimization for M4 Mac
+        """Save DataFrame to local storage with optimization for M4 Mac.
 
         Args:
             df: DataFrame to save
             path: Output path
-            format: Output format (parquet, csv, json)
-        """
+            format: Output format (parquet, csv, json).
+        ."""
         logger.info(f"Saving data to {path} in {format} format")
 
         # Coalesce to reduce number of files for local storage
@@ -208,8 +199,7 @@ class DataIngestion:
         logger.info(f"Data saved successfully")
 
     def create_sample_dataset(self, df: DataFrame, sample_size: float = 0.01) -> DataFrame:
-        """
-        Create a balanced sample dataset for development and testing
+        """Create a balanced sample dataset for development and testing.
         FIXED: Handles Sentiment140's structure where negatives come first, positives last
 
         Args:
@@ -217,8 +207,8 @@ class DataIngestion:
             sample_size: Fraction of data to sample (default 1%)
 
         Returns:
-            DataFrame: Balanced sampled data
-        """
+            DataFrame: Balanced sampled data.
+        ."""
         logger.info(f"Creating balanced sample dataset with {sample_size * 100}% of data")
 
         # Check class distribution first
@@ -287,8 +277,7 @@ class DataIngestion:
             return df_fallback
 
     def create_balanced_sample_from_full_dataset(self, file_path: str, sample_size: float = 0.01) -> DataFrame:
-        """
-        Create a balanced sample directly from the dataset file without loading everything
+        """Create a balanced sample directly from the dataset file without loading everything.
         Specifically designed for Sentiment140's structure (negatives first, positives last)
         
         Args:
@@ -296,8 +285,8 @@ class DataIngestion:
             sample_size: Fraction of data to sample
             
         Returns:
-            DataFrame: Balanced sample
-        """
+            DataFrame: Balanced sample.
+        ."""
         logger.info(f"Creating balanced sample directly from file: {file_path}")
         
         try:
@@ -392,9 +381,8 @@ class DataIngestion:
 
 
 def main():
-    """
-    Main function to demonstrate data ingestion
-    """
+    """Main function to demonstrate data ingestion.
+    ."""
     # Initialize ingestion
     ingestion = DataIngestion()
 

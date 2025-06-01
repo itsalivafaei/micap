@@ -1,8 +1,8 @@
-"""
-Phase 2 Pipeline Runner - Brand Recognition and Competitor Analysis
+"""Phase 2 Pipeline Runner - Brand Recognition and Competitor Analysis.
+
 Executes brand/competitor detection and competitive analysis
 Author: AI Assistant
-Date: 2024
+Date: 2024.
 """
 
 import os
@@ -52,8 +52,8 @@ def run_phase2_pipeline(sample_size: float = 0.1):
     Run complete Phase 2 pipeline: Brand Recognition and Competitor Analysis
     
     Args:
-        sample_size: Fraction of data to process (0.1 = 10%)
-    """
+        sample_size: Fraction of data to process (0.1 = 10%).
+    ."""
     start_time = time.time()
     logger.info("=" * 60)
     logger.info("Starting Phase 2 Pipeline - Brand Recognition & Competitor Analysis")
@@ -320,8 +320,8 @@ def run_brand_analysis_only(spark, df):
         df: Input DataFrame
         
     Returns:
-        DataFrame with brand/product entities
-    """
+        DataFrame with brand/product entities.
+    ."""
     logger.info("Running brand analysis only...")
     
     # Initialize components

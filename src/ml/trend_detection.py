@@ -1,7 +1,9 @@
-"""
-Trend Detection Module for Market Intelligence
-Implements LDA topic modeling, anomaly detection, and trend forecasting
-"""
+"""Trend Detection Module for Market Intelligence.
+
+.
+
+Implements LDA topic modeling, anomaly detection, and trend forecasting.
+."""
 
 import logging
 from typing import Dict, List, Tuple
@@ -28,34 +30,26 @@ logger = logging.getLogger(__name__)
 
 
 class TopicModeler:
-    """
-    Implements LDA topic modeling for trend detection
-    """
-
-    def __init__(self, spark: SparkSession, num_topics: int = 20):
-        """
-        Initialize topic modeler
+    """Implements LDA topic modeling for trend detection."""def __init__(self, spark: SparkSession, num_topics: int = 20):."""Initialize topic modeler.
 
         Args:
             spark: Active SparkSession
-            num_topics: Number of topics to extract
-        """
-        self.spark = spark
+            num_topics: Number of topics to extract.
+        ."""self.spark = spark.
         self.num_topics = num_topics
         self.model = None
         self.vocabulary = None
 
     def fit_topics(self, df: DataFrame, text_col: str = "tokens_lemmatized") -> 'TopicModeler':
-        """
-        Fit LDA model on text data
+        """Fit LDA model on text data.
 
         Args:
             df: DataFrame with tokenized text
             text_col: Column containing tokens
 
         Returns:
-            Self for chaining
-        """
+            Self for chaining.
+        ."""
         logger.info(f"Fitting LDA model with {self.num_topics} topics")
 
         # Remove stop words
@@ -104,15 +98,14 @@ class TopicModeler:
         return self
 
     def get_topics(self, max_words: int = 10) -> Dict[int, List[Tuple[str, float]]]:
-        """
-        Extract topic descriptions
+        """Extract topic descriptions.
 
         Args:
             max_words: Maximum words per topic
 
         Returns:
-            Dictionary of topic ID to word-weight tuples
-        """
+            Dictionary of topic ID to word-weight tuples.
+        ."""
         if self.model is None:
             raise ValueError("Model not fitted yet")
 
@@ -135,15 +128,14 @@ class TopicModeler:
         return topics
 
     def transform(self, df: DataFrame) -> DataFrame:
-        """
-        Transform documents to topic distributions
+        """Transform documents to topic distributions.
 
         Args:
             df: DataFrame to transform
 
         Returns:
-            DataFrame with topic distributions
-        """
+            DataFrame with topic distributions.
+        ."""
         if self.model is None:
             raise ValueError("Model not fitted yet")
 
@@ -152,8 +144,7 @@ class TopicModeler:
     def detect_emerging_topics(self, df: DataFrame,
                                window_size: str = "7 days",
                                growth_threshold: float = 0.5) -> DataFrame:
-        """
-        Detect emerging topics based on growth rate
+        """Detect emerging topics based on growth rate.
 
         Args:
             df: DataFrame with topic distributions over time
@@ -161,8 +152,8 @@ class TopicModeler:
             growth_threshold: Minimum growth rate to consider emerging
 
         Returns:
-            DataFrame of emerging topics
-        """
+            DataFrame of emerging topics.
+        ."""
         logger.info("Detecting emerging topics")
 
         # Get topic distributions
@@ -211,20 +202,14 @@ class TopicModeler:
 
 
 class TrendForecaster:
-    """
-    Forecasts sentiment and mention trends using Prophet
-    """
-
-    def __init__(self, spark: SparkSession):
-        """Initialize trend forecaster"""
-        self.spark = spark
+    """Forecasts sentiment and mention trends using Prophet.
+    ."""def __init__(self, spark: SparkSession):."""Initialize trend forecaster."""self.spark = spark.
         self.models = {}
 
     def forecast_brand_sentiment(self, df: pd.DataFrame,
                                  brand: str,
                                  horizon: int = 7) -> pd.DataFrame:
-        """
-        Forecast sentiment trend for a brand
+        """Forecast sentiment trend for a brand
 
         Args:
             df: Pandas DataFrame with historical data
@@ -232,8 +217,8 @@ class TrendForecaster:
             horizon: Forecast horizon in days
 
         Returns:
-            DataFrame with forecast
-        """
+            DataFrame with forecast.
+        ."""
         logger.info(f"Forecasting sentiment for {brand}")
 
         # Prepare data for Prophet
@@ -270,8 +255,7 @@ class TrendForecaster:
     def forecast_market_trends(self, df: DataFrame,
                                metrics: List[str],
                                horizon: int = 7) -> Dict[str, pd.DataFrame]:
-        """
-        Forecast multiple market metrics
+        """Forecast multiple market metrics.
 
         Args:
             df: Spark DataFrame with historical data
@@ -279,8 +263,8 @@ class TrendForecaster:
             horizon: Forecast horizon
 
         Returns:
-            Dictionary of forecasts by metric
-        """
+            Dictionary of forecasts by metric.
+        ."""
         logger.info(f"Forecasting market trends for {metrics}")
 
         # Convert to pandas
@@ -313,8 +297,7 @@ class TrendForecaster:
     def forecast_sentiment_trends(self, df: DataFrame,
                                   horizon: int = 7,
                                   granularity: str = "daily") -> DataFrame:
-        """
-        Forecast overall sentiment trends
+        """Forecast overall sentiment trends.
 
         Args:
             df: Spark DataFrame with sentiment data
@@ -322,8 +305,8 @@ class TrendForecaster:
             granularity: Time granularity (hourly/daily)
 
         Returns:
-            DataFrame with sentiment forecasts
-        """
+            DataFrame with sentiment forecasts.
+        ."""
         logger.info("Forecasting overall sentiment trends")
 
         # Aggregate sentiment by time window
@@ -375,8 +358,7 @@ class TrendForecaster:
     def forecast_topic_trends(self, df: DataFrame,
                               topic_modeler: 'TopicModeler',
                               horizon: int = 7) -> DataFrame:
-        """
-        Forecast topic popularity trends
+        """Forecast topic popularity trends.
 
         Args:
             df: DataFrame with topic distributions (already transformed)
@@ -384,8 +366,8 @@ class TrendForecaster:
             horizon: Forecast horizon in days
 
         Returns:
-            DataFrame with topic trend forecasts
-        """
+            DataFrame with topic trend forecasts.
+        ."""
         logger.info("Forecasting topic trends")
 
         # Check if the DataFrame already has topicDistribution column
@@ -464,33 +446,27 @@ class TrendForecaster:
 
 
 class AnomalyDetector:
-    """
-    Detects anomalies in sentiment patterns
-    """
-
-    def __init__(self, spark: SparkSession, contamination: float = 0.05):
-        """
-        Initialize anomaly detector
+    """Detects anomalies in sentiment patterns.
+    ."""def __init__(self, spark: SparkSession, contamination: float = 0.05):."""Initialize anomaly detector.
 
         Args:
-            contamination: Expected proportion of anomalies
-        """
+            contamination: Expected proportion of anomalies.
+        ."""
         self.spark = spark
         self.contamination = contamination
         self.models = {}
 
     def detect_sentiment_anomalies(self, df: DataFrame,
                                    features: List[str]) -> DataFrame:
-        """
-        Detect anomalies in sentiment patterns
+        """Detect anomalies in sentiment patterns.
 
         Args:
             df: DataFrame with sentiment data
             features: Features to use for anomaly detection
 
         Returns:
-            DataFrame with anomaly labels
-        """
+            DataFrame with anomaly labels.
+        ."""
         logger.info("Detecting sentiment anomalies")
 
         # Convert to pandas for sklearn
@@ -535,15 +511,14 @@ class AnomalyDetector:
             return df.withColumn("is_anomaly", lit(0)).withColumn("anomaly_score", lit(0.0))
 
     def detect_volume_anomalies(self, df: DataFrame) -> DataFrame:
-        """
-        Detect anomalies in tweet volumes
+        """Detect anomalies in tweet volumes.
 
         Args:
             df: DataFrame with tweet counts
 
         Returns:
-            DataFrame with volume anomaly flags
-        """
+            DataFrame with volume anomaly flags.
+        ."""
         logger.info("Detecting volume anomalies")
 
         # First aggregate by time window to get volume counts
@@ -589,30 +564,24 @@ class AnomalyDetector:
 
 
 class ViralityPredictor:
-    """
-    Predicts viral potential of content
-    """
-
-    def __init__(self, spark: SparkSession):
-        """
-        Initialize virality predictor
+    """Predicts viral potential of content.
+    ."""def __init__(self, spark: SparkSession):."""Initialize virality predictor.
 
         Args:
-            spark: Active SparkSession
-        """
+            spark: Active SparkSession.
+        ."""
         self.spark = spark
 
     def identify_viral_potential_simple(self, df: DataFrame) -> DataFrame:
-        """
-        Identify viral potential without social media metrics
+        """Identify viral potential without social media metrics.
         Uses text features as proxy for virality
 
         Args:
             df: DataFrame with text features
 
         Returns:
-            DataFrame with viral potential scores
-        """
+            DataFrame with viral potential scores.
+        ."""
         logger.info("Identifying viral potential from text features")
 
         # Create virality score from available features
@@ -650,15 +619,14 @@ class ViralityPredictor:
         return df_viral
 
     def calculate_virality_score(self, df: DataFrame) -> DataFrame:
-        """
-        Calculate virality potential score
+        """Calculate virality potential score.
 
         Args:
             df: DataFrame with tweet data
 
         Returns:
-            DataFrame with virality scores
-        """
+            DataFrame with virality scores.
+        ."""
         logger.info("Calculating virality scores")
 
         # Define virality features
@@ -710,16 +678,15 @@ class ViralityPredictor:
 
     def identify_viral_topics(self, df: DataFrame,
                               threshold: float = 0.7) -> DataFrame:
-        """
-        Identify topics with viral potential
+        """Identify topics with viral potential.
 
         Args:
             df: DataFrame with topic and virality data
             threshold: Virality score threshold
 
         Returns:
-            DataFrame of viral topics
-        """
+            DataFrame of viral topics.
+        ."""
         logger.info("Identifying viral topics")
 
         # Filter high virality content
@@ -743,7 +710,7 @@ class ViralityPredictor:
 
 # Main function for testing
 def main():
-    """Test trend detection functionality"""
+    """Test trend detection functionality."""
     from config.spark_config import create_spark_session
 
     # Create Spark session

@@ -1,8 +1,8 @@
-"""
-Topic Analysis Module for MICAP
+"""Topic Analysis Module for MICAP.
+
 Implements topic modeling and sentiment analysis by topic
-Uses LDA, clustering, and keyword extraction
-"""
+Uses LDA, clustering, and keyword extraction.
+."""
 
 import logging
 import os
@@ -38,17 +38,12 @@ logger = logging.getLogger(__name__)
 
 
 class TopicAnalyzer:
-    """
-    Performs topic modeling and analysis on sentiment data
-    """
-
-    def __init__(self, spark: SparkSession):
-        """
-        Initialize topic analyzer
+    """Performs topic modeling and analysis on sentiment data.
+    ."""def __init__(self, spark: SparkSession):."""Initialize topic analyzer.
 
         Args:
-            spark: Active SparkSession
-        """
+            spark: Active SparkSession.
+        ."""
         self.spark = spark
 
         # Extended stop words
@@ -63,8 +58,7 @@ class TopicAnalyzer:
                            num_topics: int = 10,
                            max_iter: int = 20,
                            vocab_size: int = 1000) -> Tuple[DataFrame, Dict]:
-        """
-        Extract topics using Latent Dirichlet Allocation (LDA)
+        """Extract topics using Latent Dirichlet Allocation (LDA).
 
         Args:
             df: Input DataFrame with tokenized text
@@ -73,8 +67,8 @@ class TopicAnalyzer:
             vocab_size: Maximum vocabulary size
 
         Returns:
-            Tuple of (DataFrame with topic assignments, topic descriptions)
-        """
+            Tuple of (DataFrame with topic assignments, topic descriptions).
+        ."""
         logger.info(f"Extracting {num_topics} topics using LDA...")
 
         # Ensure we have the required columns
@@ -178,8 +172,7 @@ class TopicAnalyzer:
     def cluster_tweets_by_content(self, df: DataFrame,
                                   num_clusters: int = 20,
                                   use_embeddings: bool = True) -> DataFrame:
-        """
-        Cluster tweets based on content similarity
+        """Cluster tweets based on content similarity.
 
         Args:
             df: Input DataFrame
@@ -187,8 +180,8 @@ class TopicAnalyzer:
             use_embeddings: Whether to use word embeddings
 
         Returns:
-            DataFrame with cluster assignments
-        """
+            DataFrame with cluster assignments.
+        ."""
         logger.info(f"Clustering tweets into {num_clusters} clusters...")
 
         # Determine features column to use
@@ -266,15 +259,14 @@ class TopicAnalyzer:
         return df_clustered
 
     def analyze_sentiment_by_topic(self, df: DataFrame) -> DataFrame:
-        """
-        Analyze sentiment distribution by topic
+        """Analyze sentiment distribution by topic.
 
         Args:
             df: DataFrame with topic assignments and sentiment
 
         Returns:
-            DataFrame with sentiment statistics by topic
-        """
+            DataFrame with sentiment statistics by topic.
+        ."""
         logger.info("Analyzing sentiment by topic...")
 
         # Group by topic and calculate sentiment statistics
@@ -308,8 +300,7 @@ class TopicAnalyzer:
     def extract_trending_topics(self, df: DataFrame,
                                 time_window: str = "1 day",
                                 min_count: int = 10) -> DataFrame:
-        """
-        Extract trending topics over time
+        """Extract trending topics over time.
 
         Args:
             df: Input DataFrame
@@ -317,8 +308,8 @@ class TopicAnalyzer:
             min_count: Minimum count for trending topic
 
         Returns:
-            DataFrame with trending topics
-        """
+            DataFrame with trending topics.
+        ."""
         logger.info("Extracting trending topics...")
 
         # Check if we have hashtags or create them from text
@@ -367,16 +358,15 @@ class TopicAnalyzer:
 
     def identify_polarizing_topics(self, df: DataFrame,
                                    min_tweets: int = 50) -> DataFrame:
-        """
-        Identify topics with high sentiment polarization
+        """Identify topics with high sentiment polarization.
 
         Args:
             df: DataFrame with topic assignments
             min_tweets: Minimum tweets per topic
 
         Returns:
-            DataFrame with polarization metrics
-        """
+            DataFrame with polarization metrics.
+        ."""
         logger.info("Identifying polarizing topics...")
 
         # Calculate sentiment distribution by topic
@@ -411,8 +401,7 @@ class TopicAnalyzer:
     def create_topic_network(self, df: DataFrame,
                              topic_descriptions: Dict,
                              min_edge_weight: float = 0.1) -> nx.Graph:
-        """
-        Create a network graph of topic relationships
+        """Create a network graph of topic relationships.
 
         Args:
             df: DataFrame with topic assignments
@@ -420,8 +409,8 @@ class TopicAnalyzer:
             min_edge_weight: Minimum edge weight to include
 
         Returns:
-            NetworkX graph of topic relationships
-        """
+            NetworkX graph of topic relationships.
+        ."""
         logger.info("Creating topic network...")
 
         # Calculate topic co-occurrence based on documents with multiple topics
@@ -471,15 +460,14 @@ class TopicAnalyzer:
                          topic_descriptions: Dict,
                          topic_sentiment: DataFrame,
                          output_dir: str = None):
-        """
-        Create topic analysis visualizations
+        """Create topic analysis visualizations.
 
         Args:
             df: DataFrame with topic assignments
             topic_descriptions: Topic descriptions
             topic_sentiment: Sentiment by topic DataFrame
-            output_dir: Directory to save visualizations
-        """
+            output_dir: Directory to save visualizations.
+        ."""
         if output_dir is None:
             output_dir = str(get_path("data/visualizations/topics"))
         
@@ -624,9 +612,8 @@ class TopicAnalyzer:
 
 
 def main():
-    """
-    Demonstrate topic analysis functionality
-    """
+    """Demonstrate topic analysis functionality.
+    ."""
     from config.spark_config import create_spark_session
 
     # Create Spark session

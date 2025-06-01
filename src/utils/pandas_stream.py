@@ -1,6 +1,6 @@
 # utils/pandas_stream.py
-"""
-Pandas Streaming Utilities for MICAP
+"""Pandas Streaming Utilities for MICAP.
+
 Provides memory-efficient conversion between Spark DataFrames and Pandas DataFrames.
 """
 
@@ -10,8 +10,7 @@ from pyspark.sql import DataFrame
 
 
 def spark_to_pandas_stream(df: DataFrame, batch: int = 20000) -> pd.DataFrame:
-    """
-    Convert Spark DataFrame to Pandas DataFrame using streaming to avoid memory issues.
+    """Convert Spark DataFrame to Pandas DataFrame using streaming to avoid memory issues.
     
     This function prevents memory crashes on macOS by streaming data in small batches
     rather than loading the entire DataFrame into memory at once.

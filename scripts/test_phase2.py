@@ -1,7 +1,7 @@
 """
 Test Phase 2 Pipeline Components
-Quick tests to verify functionality before full run
-"""
+Quick tests to verify functionality before full run.
+."""
 
 import os
 import sys
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def test_data_loading(spark, limit=100):
-    """Test if we can load the data"""
+    """Test if we can load the data."""
     logger.info("Testing data loading...")
     try:
         df = spark.read.parquet(str(get_path("data/processed/pipeline_features")))
@@ -31,7 +31,7 @@ def test_data_loading(spark, limit=100):
         return None
 
 def test_brand_recognition(spark, df_sample):
-    """Test brand recognition"""
+    """Test brand recognition."""
     logger.info("\nTesting brand recognition...")
     try:
         from src.ml.entity_recognition import BrandRecognizer, create_brand_recognition_udf
@@ -57,7 +57,7 @@ def test_brand_recognition(spark, df_sample):
         return None
 
 def test_anomaly_detection_data_prep(spark, df_brands):
-    """Test the problematic anomaly detection data preparation"""
+    """Test the problematic anomaly detection data preparation."""
     logger.info("\nTesting anomaly detection data preparation...")
     try:
         # This is the part that was failing
@@ -97,7 +97,7 @@ def test_anomaly_detection_data_prep(spark, df_brands):
         return False
 
 def test_topic_modeling(spark, df_sample):
-    """Test topic modeling with tiny dataset"""
+    """Test topic modeling with tiny dataset."""
     logger.info("\nTesting topic modeling...")
     try:
         from src.ml.trend_detection import TopicModeler
@@ -119,7 +119,7 @@ def test_topic_modeling(spark, df_sample):
         return False
 
 def run_all_tests():
-    """Run all component tests"""
+    """Run all component tests."""
     spark = create_spark_session("Phase2Testing")
     
     # Test 1: Load data

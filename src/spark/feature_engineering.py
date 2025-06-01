@@ -1,8 +1,8 @@
-"""
-Feature Engineering Module for MICAP - FIXED for distributed execution
+"""Feature Engineering Module for MICAP - FIXED for distributed execution.
+
 Creates ML-ready features from preprocessed text data
-FIXED: Uses lazy imports to avoid serialization issues with Spark workers
-"""
+FIXED: Uses lazy imports to avoid serialization issues with Spark workers.
+."""
 
 import logging
 import math
@@ -33,16 +33,14 @@ _sentiment_analyzer = None
 
 
 def _vader():
-    """Return one analyzer per executor (lazy-init)."""
-    global _sentiment_analyzer
+    """Return one analyzer per executor (lazy-init)."""global _sentiment_analyzer.
     if _sentiment_analyzer is None:
         _sentiment_analyzer = SentimentIntensityAnalyzer()
     return _sentiment_analyzer
 
 
 def get_vader_scores(text: str):
-    """Pure function used inside UDF."""
-    if text is None:
+    """Pure function used inside UDF."""if text is None:.
         return [0.0, 0.0, 0.0, 0.0]
     scores = _vader().polarity_scores(text)
     return [
@@ -58,19 +56,13 @@ VADER_UDF = udf(get_vader_scores, ArrayType(DoubleType()))
 
 
 class FeatureEngineer:
-    """
-    Comprehensive feature engineering for sentiment analysis
-    FIXED: Uses lazy imports to avoid worker serialization issues
-    """
-
-    def __init__(self, spark: SparkSession):
-        """
-        Initialize feature engineer
+    """Comprehensive feature engineering for sentiment analysis
+    FIXED: Uses lazy imports to avoid worker serialization issues.
+    ."""def __init__(self, spark: SparkSession):."""Initialize feature engineer
 
         Args:
-            spark: Active SparkSession
-        """
-        self.spark = spark
+            spark: Active SparkSession.
+        ."""self.spark = spark.
 
         # Initialize sentiment analyzer
         self.vader = SentimentIntensityAnalyzer()
@@ -81,11 +73,9 @@ class FeatureEngineer:
         self.min_word_count = 2
 
     def _lazy_import_ml_features(self):
-        """
-        Lazy import of PySpark ML features to avoid serialization issues
-        This ensures imports happen within the Spark context
-        """
-        try:
+        """Lazy import of PySpark ML features to avoid serialization issues
+        This ensures imports happen within the Spark context.
+        ."""try:.
             from pyspark.ml.feature import (
                 HashingTF, IDF, Word2Vec, NGram,
                 CountVectorizer, StringIndexer
@@ -108,8 +98,7 @@ class FeatureEngineer:
     def create_tfidf_features(self, df: DataFrame,
                               text_col: str = "tokens_lemmatized",
                               num_features: int = 1000) -> DataFrame:
-        """
-        Create TF-IDF features from tokenized text with lazy imports
+        """Create TF-IDF features from tokenized text with lazy imports
 
         Args:
             df: Input DataFrame
@@ -117,8 +106,8 @@ class FeatureEngineer:
             num_features: Number of TF-IDF features
 
         Returns:
-            DataFrame with TF-IDF features
-        """
+            DataFrame with TF-IDF features.
+        ."""
         logger.info(f"Creating TF-IDF features with {num_features} dimensions...")
 
         # Lazy import ML features
@@ -167,9 +156,8 @@ class FeatureEngineer:
     def extract_ngram_features(self, df: DataFrame,
                                tokens_col: str = "tokens_lemmatized",
                                n_values: List[int] = [2, 3]) -> DataFrame:
-        """
-        Extract n-gram features with lazy imports
-        """
+        """Extract n-gram features with lazy imports.
+        ."""
         logger.info(f"Extracting n-gram features for n={n_values}...")
 
         ml_imports = self._lazy_import_ml_features()
@@ -203,9 +191,8 @@ class FeatureEngineer:
     def generate_word_embeddings_optimized(self, df: DataFrame,
                                          tokens_col: str = "tokens_lemmatized",
                                          vector_size: int = 100) -> DataFrame:
-        """
-        Generate Word2Vec embeddings with memory optimization and checkpointing
-        """
+        """Generate Word2Vec embeddings with memory optimization and checkpointing.
+        ."""
         logger.info(f"Generating optimized Word2Vec embeddings with size {vector_size}...")
 
         ml_imports = self._lazy_import_ml_features()
@@ -295,16 +282,14 @@ class FeatureEngineer:
             return self._create_dummy_embeddings(df, vector_size)
 
     def _create_dummy_embeddings(self, df: DataFrame, vector_size: int) -> DataFrame:
-        """Create dummy zero embeddings when Word2Vec fails"""
-        dummy_vector = [0.0] * vector_size
+        """Create dummy zero embeddings when Word2Vec fails."""dummy_vector = [0.0] * vector_size.
         return df.withColumn("word2vec_features",
                              lit(dummy_vector).cast(ArrayType(DoubleType())))
 
     def extract_lexicon_features(self, df: DataFrame,
                                  text_col: str = "text") -> DataFrame:
-        """
-        Extract sentiment lexicon features using VADER
-        """
+        """Extract sentiment lexicon features using VADER.
+        ."""
         logger.info("Extracting sentiment lexicon features...")
 
         try:
@@ -330,9 +315,8 @@ class FeatureEngineer:
                 .withColumn("vader_neutral", lit(1.0))
 
     def extract_temporal_features(self, df: DataFrame) -> DataFrame:
-        """
-        Extract temporal features from timestamp
-        """
+        """Extract temporal features from timestamp.
+        ."""
         logger.info("Extracting temporal features...")
 
         try:
@@ -377,9 +361,8 @@ class FeatureEngineer:
                 .withColumn("time_of_day", lit("unknown"))
 
     def extract_text_statistics(self, df: DataFrame) -> DataFrame:
-        """
-        Extract statistical features from text
-        """
+        """Extract statistical features from text.
+        ."""
         logger.info("Extracting text statistics...")
 
         try:
@@ -422,9 +405,8 @@ class FeatureEngineer:
                 .withColumn("punctuation_density", lit(0.0))
 
     def create_all_features(self, df: DataFrame) -> DataFrame:
-        """
-        Create all features using the complete pipeline with error handling
-        """
+        """Create all features using the complete pipeline with error handling.
+        ."""
         logger.info("Creating all features...")
 
         # Log dataset info
@@ -463,9 +445,8 @@ class FeatureEngineer:
             raise
 
     def save_feature_stats(self, df: DataFrame, output_path: str):
-        """
-        Calculate and save feature statistics with error handling
-        """
+        """Calculate and save feature statistics with error handling.
+        ."""
         logger.info("Calculating feature statistics...")
 
         try:
@@ -498,8 +479,7 @@ class FeatureEngineer:
 
     def extract_entity_features(self, df: DataFrame,
                                 text_col: str = "text") -> DataFrame:
-        """
-        Extract named entity features for brand/product recognition
+        """Extract named entity features for brand/product recognition.
         Uses pattern matching and dictionary-based approach for distributed processing
 
         Args:
@@ -507,8 +487,8 @@ class FeatureEngineer:
             text_col: Column containing text
 
         Returns:
-            DataFrame with entity features
-        """
+            DataFrame with entity features.
+        ."""
         logger.info("Extracting named entity features...")
 
         try:
@@ -533,8 +513,7 @@ class FeatureEngineer:
 
             # UDF to extract brand mentions
             def extract_brands(text):
-                """Extract brand mentions from text"""
-                if not text:
+                """Extract brand mentions from text."""if not text:.
                     return []
 
                 text_lower = text.lower()
@@ -552,8 +531,7 @@ class FeatureEngineer:
 
             # UDF to count brand mentions
             def count_brand_mentions(text):
-                """Count total brand mentions in text"""
-                if not text:
+                """Count total brand mentions in text."""if not text:.
                     return 0
 
                 text_lower = text.lower()
@@ -569,8 +547,7 @@ class FeatureEngineer:
 
             # Pattern-based entity extraction for product categories
             def extract_product_categories(text):
-                """Extract product category mentions"""
-                if not text:
+                """Extract product category mentions."""if not text:.
                     return []
 
                 text_lower = text.lower()
@@ -618,8 +595,7 @@ class FeatureEngineer:
 
             # Add competitor co-mention feature
             def has_competitor_mentions(brands):
-                """Check if multiple competing brands are mentioned"""
-                if not brands or len(brands) < 2:
+                """Check if multiple competing brands are mentioned."""if not brands or len(brands) < 2:.
                     return 0
 
                 # Define competitor groups
@@ -659,10 +635,8 @@ class FeatureEngineer:
             return df
 
     def can_train_word2vec(self, df: DataFrame, tokens_col: str = "tokens_lemmatized") -> bool:
-        """
-        Check if Word2Vec training is feasible given memory constraints
-        """
-        try:
+        """Check if Word2Vec training is feasible given memory constraints.
+        ."""try:.
             # Get system info
             import psutil
             available_memory_gb = psutil.virtual_memory().available / (1024**3)
@@ -693,9 +667,8 @@ class FeatureEngineer:
 
 
 def main():
-    """
-    Demonstrate feature engineering functionality
-    """
+    """Demonstrate feature engineering functionality.
+    ."""
     from config.spark_config import create_spark_session
 
     # Create Spark session

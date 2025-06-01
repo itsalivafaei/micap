@@ -1,9 +1,9 @@
-"""
-Enhanced Competitor Analysis Module for MICAP
+"""Enhanced Competitor Analysis Module for MICAP.
+
 Combines fork safety with comprehensive competitive intelligence features
 Author: AI Assistant (Enhanced Hybrid Version)
-Date: 2024
-"""
+Date: 2024.
+."""
 
 import os
 import logging
@@ -44,11 +44,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_brand_recognition_udf():
-    """
-    Returns a fork-safe UDF that initializes BrandRecognizer once per executor.
+    """Returns a fork-safe UDF that initializes BrandRecognizer once per executor.
     Updated for fuzzywuzzy-first approach.
     This avoids the macOS fork safety issue with Metal/MPS.
-    """
+    ."""
     def _recognize_brands(text):
         if not hasattr(_recognize_brands, "_model"):
             # Heavy imports happen here, inside the worker
@@ -76,9 +75,8 @@ def create_brand_recognition_udf():
 
 
 def create_feature_extraction_udf(features: List[str]):
-    """
-    Create a UDF for feature extraction with predefined features.
-    """
+    """Create a UDF for feature extraction with predefined features.
+    ."""
     features_broadcast = features
     
     def extract_features(text):
@@ -95,8 +93,7 @@ def create_feature_extraction_udf(features: List[str]):
 
 
 class CompetitorAnalyzer:
-    """
-    Enhanced competitor analysis with fork safety and comprehensive features.
+    """Enhanced competitor analysis with fork safety and comprehensive features.
     
     Key capabilities:
     - Fork-safe brand recognition
@@ -104,17 +101,13 @@ class CompetitorAnalyzer:
     - Feature-level competitive analysis
     - Market positioning insights
     - Automated opportunity/threat detection
-    - Comprehensive visualizations
-    """
-    
-    def __init__(self, spark: SparkSession, brand_recognizer=None):
-        """
-        Initialize competitor analyzer.
+    - Comprehensive visualizations.
+    ."""def __init__(self, spark: SparkSession, brand_recognizer=None):."""Initialize competitor analyzer.
         
         Args:
             spark: Active SparkSession
-            brand_recognizer: Optional BrandRecognizer for driver-side operations
-        """
+            brand_recognizer: Optional BrandRecognizer for driver-side operations.
+        ."""
         self.spark = spark
         self.brand_recognizer = brand_recognizer
         
@@ -129,15 +122,14 @@ class CompetitorAnalyzer:
         logger.info("Initialized CompetitorAnalyzer")
         
     def parse_brand_confidence(self, df: DataFrame) -> DataFrame:
-        """
-        Parse brand:confidence strings into structured columns.
+        """Parse brand:confidence strings into structured columns.
         
         Args:
             df: DataFrame with brands array column
             
         Returns:
-            DataFrame with parsed brand and confidence columns
-        """
+            DataFrame with parsed brand and confidence columns.
+        ."""
         # Explode brands array to individual rows
         df_brands = df.select(
             col("*"),
@@ -158,8 +150,7 @@ class CompetitorAnalyzer:
     def aggregate_brand_sentiment(self, df: DataFrame,
                                   time_window: str = "1 day",
                                   confidence_threshold: float = 0.7) -> DataFrame:
-        """
-        Aggregate sentiment metrics by brand and time window with enhanced metrics.
+        """Aggregate sentiment metrics by brand and time window with enhanced metrics.
         
         Args:
             df: DataFrame with brand recognition results
@@ -167,8 +158,8 @@ class CompetitorAnalyzer:
             confidence_threshold: Minimum confidence for inclusion
             
         Returns:
-            DataFrame with comprehensive brand sentiment metrics
-        """
+            DataFrame with comprehensive brand sentiment metrics.
+        ."""
         logger.info(f"Aggregating brand sentiment with {time_window} window")
         
         # Parse brand data
@@ -256,8 +247,7 @@ class CompetitorAnalyzer:
                                      target_brand: str,
                                      time_window: str = "1 day",
                                      competitors: List[str] = None) -> DataFrame:
-        """
-        Enhanced competitor comparison with relative performance metrics.
+        """Enhanced competitor comparison with relative performance metrics.
         
         Args:
             df: DataFrame with brand sentiment
@@ -266,8 +256,8 @@ class CompetitorAnalyzer:
             competitors: Optional list of competitors (auto-detected if None)
             
         Returns:
-            DataFrame with detailed competitor comparison
-        """
+            DataFrame with detailed competitor comparison.
+        ."""
         logger.info(f"Comparing {target_brand} with competitors")
         
         # Get competitors if not provided
@@ -336,8 +326,7 @@ class CompetitorAnalyzer:
     def analyze_feature_sentiment(self, df: DataFrame,
                                   features: List[str] = None,
                                   auto_detect: bool = True) -> DataFrame:
-        """
-        Enhanced feature-level sentiment analysis with auto-detection.
+        """Enhanced feature-level sentiment analysis with auto-detection.
         
         Args:
             df: DataFrame with brand and text data
@@ -345,8 +334,8 @@ class CompetitorAnalyzer:
             auto_detect: Whether to auto-detect features from common patterns
             
         Returns:
-            DataFrame with feature-level sentiment analysis
-        """
+            DataFrame with feature-level sentiment analysis.
+        ."""
         logger.info("Analyzing feature-level sentiment")
         
         # Default features if none provided
@@ -433,8 +422,7 @@ class CompetitorAnalyzer:
                                  industry: Optional[str] = None,
                                  time_window: str = "1 day",
                                  min_mentions: int = 5) -> DataFrame:
-        """
-        Enhanced share of voice calculation with trend analysis.
+        """Enhanced share of voice calculation with trend analysis.
         
         Args:
             df: DataFrame with brand mentions
@@ -443,8 +431,8 @@ class CompetitorAnalyzer:
             min_mentions: Minimum mentions to include brand
             
         Returns:
-            DataFrame with detailed share of voice metrics
-        """
+            DataFrame with detailed share of voice metrics.
+        ."""
         logger.info("Calculating share of voice")
         
         # Get brands to analyze
@@ -523,8 +511,7 @@ class CompetitorAnalyzer:
     def compute_sentiment_momentum(self, df: DataFrame,
                                    lookback_windows: int = 7,
                                    forecast_windows: int = 3) -> DataFrame:
-        """
-        Enhanced momentum calculation with velocity and acceleration.
+        """Enhanced momentum calculation with velocity and acceleration.
         
         Args:
             df: DataFrame with time-series brand sentiment
@@ -532,8 +519,8 @@ class CompetitorAnalyzer:
             forecast_windows: Number of windows for trend projection
             
         Returns:
-            DataFrame with comprehensive momentum indicators
-        """
+            DataFrame with comprehensive momentum indicators.
+        ."""
         logger.info(f"Computing sentiment momentum with {lookback_windows} lookback")
         
         # Ensure we have daily aggregation
@@ -643,8 +630,7 @@ class CompetitorAnalyzer:
                                       target_brand: str,
                                       competitors: Optional[List[str]] = None,
                                       save_path: Optional[str] = None) -> Dict:
-        """
-        Generate comprehensive competitive insights with recommendations.
+        """Generate comprehensive competitive insights with recommendations.
         
         Args:
             df: DataFrame with analysis results  
@@ -653,8 +639,8 @@ class CompetitorAnalyzer:
             save_path: Optional path to save insights JSON
             
         Returns:
-            Dictionary of insights and recommendations
-        """
+            Dictionary of insights and recommendations.
+        ."""
         logger.info(f"Generating competitive insights for {target_brand}")
         
         insights = {
@@ -865,14 +851,13 @@ class CompetitorAnalyzer:
     def visualize_competitive_landscape(self, df: DataFrame,
                                         target_brand: str = None,
                                         output_dir: str = None):
-        """
-        Create comprehensive competitive analysis visualizations.
+        """Create comprehensive competitive analysis visualizations.
         
         Args:
             df: DataFrame with competitive analysis data
             target_brand: Optional brand to highlight
-            output_dir: Directory to save visualizations
-        """
+            output_dir: Directory to save visualizations.
+        ."""
         if output_dir is None:
             output_dir = str(get_path("data/visualizations/competitive_analysis"))
             

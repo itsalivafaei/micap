@@ -1,5 +1,5 @@
-"""
-Hybrid Entity Recognition Module for MICAP
+"""Hybrid Entity Recognition Module for MICAP.
+
 Uses fuzzywuzzy as the primary matching approach for robust entity detection
 Dependencies: fuzzywuzzy (required), spacy (optional)
 """
@@ -40,8 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 class BrandRecognizer:
-    """
-    Advanced brand recognizer using fuzzywuzzy as the primary matching approach.
+    """Advanced brand recognizer using fuzzywuzzy as the primary matching approach.
     
     Features:
     - fuzzywuzzy-first fuzzy matching with multiple scoring algorithms
@@ -59,8 +58,7 @@ class BrandRecognizer:
         use_spacy: bool = False,
         scorer_weights: Dict[str, float] = None
     ):
-        """
-        Initialize brand recognizer with fuzzywuzzy-first approach.
+        """Initialize brand recognizer with fuzzywuzzy-first approach.
         
         Args:
             config_path: Path to brand configuration JSON
@@ -109,8 +107,7 @@ class BrandRecognizer:
         logger.info(f"Scorer weights: {self.scorer_weights}")
         
     def _load_config(self, config_path: str) -> Dict:
-        """Load brand configuration from JSON file."""
-        try:
+        """Load brand configuration from JSON file."""try:.
             with open(config_path, 'r') as f:
                 config = json.load(f)
                 logger.info(f"Loaded brand config from {config_path}")
@@ -120,8 +117,7 @@ class BrandRecognizer:
             raise
             
     def _extract_all_brands(self) -> Dict[str, Dict]:
-        """Extract all brands from configuration."""
-        brands = {}
+        """Extract all brands from configuration."""brands = {}.
         for industry, industry_data in self.config.get('industries', {}).items():
             for brand_data in industry_data.get('brands', []):
                 brand_name = brand_data['name'].lower()
@@ -136,8 +132,7 @@ class BrandRecognizer:
         return brands
         
     def _build_search_terms(self) -> List[str]:
-        """Build comprehensive list of search terms for fuzzywuzzy matching."""
-        terms = []
+        """Build comprehensive list of search terms for fuzzywuzzy matching."""terms = [].
         for brand_name, data in self.brands.items():
             # Add brand name
             terms.append(data['original_name'])
@@ -157,8 +152,7 @@ class BrandRecognizer:
         return unique_terms
         
     def _build_term_mapping(self) -> Dict[str, str]:
-        """Map search terms back to their canonical brand names."""
-        mapping = {}
+        """Map search terms back to their canonical brand names."""mapping = {}.
         for brand_name, data in self.brands.items():
             original = data['original_name']
             
@@ -175,8 +169,7 @@ class BrandRecognizer:
         return mapping
         
     def recognize_brands(self, text: str, return_details: bool = True) -> Union[List[Dict], List[Tuple]]:
-        """
-        Recognize brand mentions using fuzzywuzzy-first approach.
+        """Recognize brand mentions using fuzzywuzzy-first approach.
         
         Args:
             text: Input text to analyze
@@ -184,8 +177,7 @@ class BrandRecognizer:
             
         Returns:
             List of brand detections with confidence and metadata
-        """
-        if not text or not text.strip():
+        """if not text or not text.strip():.
             return []
             
         logger.debug(f"Processing text: {text[:100]}...")
@@ -247,8 +239,7 @@ class BrandRecognizer:
         return found_brands
     
     def _extract_text_chunks(self, text: str) -> List[Dict]:
-        """Extract meaningful text chunks for fuzzy matching."""
-        chunks = []
+        """Extract meaningful text chunks for fuzzy matching."""chunks = [].
         
         # Extract phrases (noun phrases, multi-word terms)
         # Simple heuristic: sequences of 1-4 words
@@ -273,8 +264,7 @@ class BrandRecognizer:
         return chunks
     
     def _fuzzy_match_chunk(self, chunk_text: str, position: int) -> List[Dict]:
-        """Perform fuzzy matching on a text chunk using multiple scorers."""
-        matches = []
+        """Perform fuzzy matching on a text chunk using multiple scorers."""matches = [].
         
         # Use fuzzywuzzy's process.extract for efficient matching
         candidates = process.extract(
@@ -317,8 +307,7 @@ class BrandRecognizer:
         return matches
     
     def _calculate_composite_score(self, text1: str, text2: str) -> float:
-        """Calculate weighted composite score using multiple fuzzywuzzy scorers."""
-        scores = {
+        """Calculate weighted composite score using multiple fuzzywuzzy scorers."""scores = {.
             'ratio': fuzz.ratio(text1, text2),
             'partial_ratio': fuzz.partial_ratio(text1, text2),
             'token_sort_ratio': fuzz.token_sort_ratio(text1, text2),
@@ -336,8 +325,7 @@ class BrandRecognizer:
         return composite
     
     def _extract_words_with_positions(self, text: str) -> List[Dict]:
-        """Extract individual words with their positions."""
-        words = []
+        """Extract individual words with their positions."""words = [].
         for match in re.finditer(r'\b\w+\b', text):
             words.append({
                 'word': match.group(),
@@ -347,8 +335,7 @@ class BrandRecognizer:
         return words
     
     def _fuzzy_match_word(self, word_info: Dict) -> Optional[Dict]:
-        """Perform fuzzy matching on a single word."""
-        word = word_info['word']
+        """Perform fuzzy matching on a single word."""word = word_info['word'].
         
         # Use process.extractOne for single best match
         result = process.extractOne(
@@ -381,8 +368,7 @@ class BrandRecognizer:
         return None
     
     def _spacy_entity_extraction(self, text: str, processed_positions: Set[int]) -> List[Dict]:
-        """Extract entities using spaCy NER and match with fuzzywuzzy."""
-        if not self.nlp:
+        """Extract entities using spaCy NER and match with fuzzywuzzy."""if not self.nlp:.
             return []
             
         matches = []
@@ -424,8 +410,7 @@ class BrandRecognizer:
         return matches
     
     def _context_based_detection(self, text: str, existing_brands: List[Dict]) -> List[Dict]:
-        """Detect brands based on context clues and keyword co-occurrence."""
-        if len(existing_brands) >= 3:  # Skip if we already found many brands
+        """Detect brands based on context clues and keyword co-occurrence."""if len(existing_brands) >= 3:  # Skip if we already found many brands.
             return []
             
         matches = []
@@ -475,8 +460,7 @@ class BrandRecognizer:
         return matches
     
     def _deduplicate_and_rank(self, detections: List[Dict]) -> List[Dict]:
-        """Remove duplicates and rank by confidence and match quality."""
-        if not detections:
+        """Remove duplicates and rank by confidence and match quality."""if not detections:.
             return []
             
         # Group by brand
@@ -520,8 +504,7 @@ class BrandRecognizer:
         return final_detections
 
     def get_brand_info(self, brand_name: str) -> Optional[Dict]:
-        """Get detailed information about a brand."""
-        # Look up by original name first, then by any search term
+        """Get detailed information about a brand."""# Look up by original name first, then by any search term.
         for brand_key, data in self.brands.items():
             if (data['original_name'].lower() == brand_name.lower() or 
                 brand_name.lower() in [alias.lower() for alias in data['aliases']]):
@@ -530,8 +513,7 @@ class BrandRecognizer:
         
     @property
     def competitor_map(self) -> Dict[str, Set[str]]:
-        """Lazy-loaded bidirectional competitor map."""
-        if not hasattr(self, '_competitor_map'):
+        """Lazy-loaded bidirectional competitor map."""if not hasattr(self, '_competitor_map'):.
             comp_map = {}
             for brand, data in self.brands.items():
                 original = data['original_name']
@@ -552,20 +534,14 @@ class BrandRecognizer:
 
 
 class ProductExtractor:
-    """
-    Extract product mentions with brand association using fuzzywuzzy.
+    """Extract product mentions with brand association using fuzzywuzzy.
     Enhanced with pattern variations and version detection.
-    """
-    
-    def __init__(self, brand_recognizer: BrandRecognizer):
-        """Initialize with brand recognizer instance."""
-        self.brand_recognizer = brand_recognizer
+    """def __init__(self, brand_recognizer: BrandRecognizer):."""Initialize with brand recognizer instance."""self.brand_recognizer = brand_recognizer.
         self.product_terms = self._build_product_terms()
         self.product_to_brand = self._build_product_mapping()
         
     def _build_product_terms(self) -> List[str]:
-        """Build list of product terms for fuzzywuzzy matching."""
-        terms = []
+        """Build list of product terms for fuzzywuzzy matching."""terms = [].
         for brand_name, data in self.brand_recognizer.brands.items():
             for product in data.get('products', []):
                 terms.append(product)
@@ -579,8 +555,7 @@ class ProductExtractor:
         return list(set(terms))  # Remove duplicates
         
     def _build_product_mapping(self) -> Dict[str, str]:
-        """Map product terms to their brand names."""
-        mapping = {}
+        """Map product terms to their brand names."""mapping = {}.
         for brand_name, data in self.brand_recognizer.brands.items():
             original = data['original_name']
             for product in data.get('products', []):
@@ -593,8 +568,7 @@ class ProductExtractor:
         return mapping
         
     def extract_products(self, text: str, detected_brands: List[Dict] = None) -> List[Dict]:
-        """
-        Extract product mentions from text using fuzzywuzzy.
+        """Extract product mentions from text using fuzzywuzzy.
         
         Args:
             text: Input text
@@ -602,8 +576,7 @@ class ProductExtractor:
             
         Returns:
             List of product detections
-        """
-        if not text or not text.strip():
+        """if not text or not text.strip():.
             return []
             
         found_products = []
@@ -660,18 +633,12 @@ class ProductExtractor:
 
 
 class CompetitorMapper:
-    """
-    Enhanced competitor mapping with relationship analysis using fuzzywuzzy.
-    """
-    
-    def __init__(self, brand_recognizer: BrandRecognizer):
-        """Initialize with brand recognizer."""
-        self.brand_recognizer = brand_recognizer
+    """Enhanced competitor mapping with relationship analysis using fuzzywuzzy.
+    """def __init__(self, brand_recognizer: BrandRecognizer):."""Initialize with brand recognizer."""self.brand_recognizer = brand_recognizer.
         self.competitor_map = brand_recognizer.competitor_map
         
     def identify_competitive_context(self, text: str, brands: List[Dict]) -> List[Dict]:
-        """
-        Identify competitive contexts in text.
+        """Identify competitive contexts in text.
         
         Args:
             text: Input text
@@ -679,8 +646,7 @@ class CompetitorMapper:
             
         Returns:
             List of competitive contexts
-        """
-        if len(brands) < 2:
+        """if len(brands) < 2:.
             return []
             
         text_lower = text.lower()
@@ -728,8 +694,7 @@ class CompetitorMapper:
         return contexts
     
     def _are_fuzzy_competitors(self, brand1: str, brand2: str) -> bool:
-        """Check if two brands might be competitors using fuzzy industry matching."""
-        brand1_info = self.brand_recognizer.get_brand_info(brand1)
+        """Check if two brands might be competitors using fuzzy industry matching."""brand1_info = self.brand_recognizer.get_brand_info(brand1).
         brand2_info = self.brand_recognizer.get_brand_info(brand2)
         
         if not (brand1_info and brand2_info):
@@ -746,17 +711,11 @@ class CompetitorMapper:
 
 
 class EntityDisambiguator:
-    """
-    Advanced disambiguation using multiple signals and fuzzywuzzy.
-    """
-    
-    def __init__(self, brand_recognizer: BrandRecognizer):
-        """Initialize disambiguator."""
-        self.brand_recognizer = brand_recognizer
+    """Advanced disambiguation using multiple signals and fuzzywuzzy.
+    """def __init__(self, brand_recognizer: BrandRecognizer):."""Initialize disambiguator."""self.brand_recognizer = brand_recognizer.
         
     def disambiguate(self, entities: List[Dict], text: str) -> List[Dict]:
-        """
-        Disambiguate entities using context and overlap detection.
+        """Disambiguate entities using context and overlap detection.
         
         Args:
             entities: List of detected entities
@@ -764,8 +723,7 @@ class EntityDisambiguator:
             
         Returns:
             Disambiguated entities
-        """
-        if not entities:
+        """if not entities:.
             return []
             
         # Remove overlapping entities
@@ -780,8 +738,7 @@ class EntityDisambiguator:
         return entities
         
     def _remove_overlaps(self, entities: List[Dict]) -> List[Dict]:
-        """Remove overlapping entity detections, keeping higher confidence ones."""
-        # Sort by position
+        """Remove overlapping entity detections, keeping higher confidence ones."""# Sort by position.
         positioned = [e for e in entities if e.get('position', -1) >= 0]
         positioned.sort(key=lambda x: x['position'])
         
@@ -808,8 +765,7 @@ class EntityDisambiguator:
         return non_overlapping
         
     def _apply_fuzzy_context_boost(self, entities: List[Dict], text: str) -> List[Dict]:
-        """Boost confidence based on fuzzy context matching."""
-        text_lower = text.lower()
+        """Boost confidence based on fuzzy context matching."""text_lower = text.lower().
         
         # Enhanced industry/category keywords
         industry_keywords = {
@@ -846,8 +802,7 @@ class EntityDisambiguator:
 
 # Spark UDF creators
 def create_brand_recognition_udf(config_path: str = None):
-    """Create Spark UDF for brand recognition using fuzzywuzzy."""
-    recognizer = BrandRecognizer(config_path, use_spacy=False)
+    """Create Spark UDF for brand recognition using fuzzywuzzy."""recognizer = BrandRecognizer(config_path, use_spacy=False).
     
     def recognize_wrapper(text):
         if not text:
@@ -863,8 +818,7 @@ def create_brand_recognition_udf(config_path: str = None):
 
 
 def create_product_extraction_udf(config_path: str = None):
-    """Create Spark UDF for product extraction using fuzzywuzzy."""
-    recognizer = BrandRecognizer(config_path, use_spacy=False)
+    """Create Spark UDF for product extraction using fuzzywuzzy."""recognizer = BrandRecognizer(config_path, use_spacy=False).
     extractor = ProductExtractor(recognizer)
     
     def extract_wrapper(text):

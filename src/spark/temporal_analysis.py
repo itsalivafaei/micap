@@ -1,5 +1,5 @@
-"""
-Temporal Analysis Module for MICAP
+"""Temporal Analysis Module for MICAP.
+
 Analyzes sentiment trends over time periods
 Implements time series analysis and anomaly detection
 """
@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 
 # safe ratio helper  (Spark ≥3.5)
 def safe_ratio(numer, denom):
-    """
-    Safely divide two columns, returning NULL when denominator is 0.
+    """Safely divide two columns, returning NULL when denominator is 0.
     
     This function prevents division by zero errors in Spark DataFrames
     by using the try_divide function (Spark 3.5+) or conditional logic.
@@ -57,13 +56,8 @@ def safe_ratio(numer, denom):
 
 
 class TemporalAnalyzer:
-    """
-    Performs temporal analysis of sentiment data
-    """
-
-    def __init__(self, spark: SparkSession):
-        """
-        Initialize temporal analyzer
+    """Performs temporal analysis of sentiment data.
+    """def __init__(self, spark: SparkSession):."""Initialize temporal analyzer.
 
         Args:
             spark: Active SparkSession
@@ -78,8 +72,7 @@ class TemporalAnalyzer:
 
     def aggregate_sentiment_by_time(self, df: DataFrame,
                                     time_window: str = 'hourly') -> DataFrame:
-        """
-        Aggregate sentiment scores by time windows
+        """Aggregate sentiment scores by time windows.
 
         Args:
             df: Input DataFrame with timestamp and sentiment
@@ -122,8 +115,7 @@ class TemporalAnalyzer:
         return agg_df.orderBy("window_start")
 
     def _add_time_features(self, df: DataFrame) -> DataFrame:
-        """
-        Add time-based features for analysis
+        """Add time-based features for analysis.
 
         Args:
             df: DataFrame with window_start column
@@ -149,8 +141,7 @@ class TemporalAnalyzer:
                                    metric: str = "avg_sentiment",
                                    window_size: int = 24,
                                    threshold: float = 2.0) -> DataFrame:
-        """
-        Detect anomalies in sentiment patterns using statistical methods
+        """Detect anomalies in sentiment patterns using statistical methods.
 
         Args:
             df: Aggregated sentiment DataFrame
@@ -211,8 +202,7 @@ class TemporalAnalyzer:
         return df
 
     def analyze_sentiment_trends(self, df: DataFrame) -> Dict[str, pd.DataFrame]:
-        """
-        Analyze sentiment trends across different time granularities
+        """Analyze sentiment trends across different time granularities.
 
         Args:
             df: Input DataFrame with sentiment data
@@ -264,8 +254,7 @@ class TemporalAnalyzer:
 
     def calculate_sentiment_momentum(self, df: DataFrame,
                                      window_size: int = 7) -> DataFrame:
-        """
-        Calculate sentiment momentum indicators
+        """Calculate sentiment momentum indicators.
 
         Args:
             df: Aggregated sentiment DataFrame
@@ -330,8 +319,7 @@ class TemporalAnalyzer:
 
     def perform_time_series_decomposition(self, df: pd.DataFrame,
                                           period: int = 24) -> Dict:
-        """
-        Perform time series decomposition on sentiment data
+        """Perform time series decomposition on sentiment data.
 
         Args:
             df: Pandas DataFrame with time series data
@@ -377,8 +365,7 @@ class TemporalAnalyzer:
 
     def create_temporal_visualizations(self, trends: Dict[str, pd.DataFrame],
                                        output_dir: str = str(get_path("data/visualizations"))):
-        """
-        Create temporal analysis visualizations
+        """Create temporal analysis visualizations.
 
         Args:
             trends: Dictionary of trend DataFrames
@@ -491,8 +478,7 @@ class TemporalAnalyzer:
 
 
 def main():
-    """
-    Demonstrate temporal analysis functionality
+    """Demonstrate temporal analysis functionality.
     """
     from config.spark_config import create_spark_session
 

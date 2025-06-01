@@ -1,9 +1,9 @@
-"""
-Text Preprocessing Module for MICAP - No external dependencies
+"""Text Preprocessing Module for MICAP - No external dependencies.
+
 Handles all text cleaning and normalization tasks
 Optimized for parallel processing on M4 Mac
-Compatible replacement for emoji/spacy dependencies
-"""
+Compatible replacement for emoji/spacy dependencies.
+."""
 
 import re
 import string
@@ -43,17 +43,16 @@ def create_spark_session(app_name: str) -> SparkSession:
     )
 
 class TextPreprocessor:
-    """
-    Comprehensive text preprocessing for tweet sentiment analysis
-    Handles cleaning, normalization, and feature preparation
+    """Comprehensive text preprocessing for tweet sentiment analysis.
+    
+    Handles cleaning, normalization, and feature preparation.
     """
 
     def __init__(self, spark: SparkSession):
-        """
-        Initialize preprocessor with Spark session
+        """Initialize preprocessor with Spark session.
 
         Args:
-            spark: Active SparkSession
+            spark: Active SparkSession.
         """
         self.spark = spark
 
@@ -85,11 +84,10 @@ class TextPreprocessor:
         self._register_udfs()
 
     def _register_udfs(self):
-        """Register User Defined Functions for complex preprocessing"""
-
+        """Register User Defined Functions for complex preprocessing."""
         # Enhanced emoji sentiment without external dependencies
         def extract_emoji_sentiment_enhanced(text):
-            """Extract sentiment from emojis using Unicode ranges and comprehensive patterns"""
+            """Extract sentiment from emojis using Unicode ranges and comprehensive patterns."""
             try:
                 emoji_sentiment = 0
 
@@ -147,7 +145,7 @@ class TextPreprocessor:
 
         # Enhanced lemmatization with better rules
         def enhanced_lemmatize(text):
-            """Enhanced rule-based lemmatization with more comprehensive patterns"""
+            """Enhanced rule-based lemmatization with more comprehensive patterns."""
             try:
                 words = text.split()
                 lemmatized = []
@@ -216,8 +214,8 @@ class TextPreprocessor:
 
         # Language detection without external dependencies
         def detect_language_basic(text):
-            """
-            Basic language detection using common word patterns and character analysis.
+            """Basic language detection using common word patterns and character analysis.
+            
             Returns language code and confidence score.
             """
             try:
@@ -232,7 +230,6 @@ class TextPreprocessor:
                     'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you',
                     'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they',
                     'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one',
-                    'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out',
                     'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when'
                 }
 
@@ -335,15 +332,14 @@ class TextPreprocessor:
         self.detect_language_udf = udf(detect_language_wrapper, language_struct)
 
     def clean_text(self, df: DataFrame, text_col: str = "text") -> DataFrame:
-        """
-        Perform basic text cleaning
+        """Perform basic text cleaning.
 
         Args:
-            df: Input DataFrame
-            text_col: Name of text column
+            df: Input DataFrame.
+            text_col: Name of text column.
 
         Returns:
-            DataFrame with cleaned text
+            DataFrame with cleaned text.
         """
         logger.info("Starting text cleaning...")
 
@@ -384,15 +380,14 @@ class TextPreprocessor:
         return df
 
     def handle_emojis(self, df: DataFrame, text_col: str = "text_clean") -> DataFrame:
-        """
-        Handle emojis - extract sentiment and clean text
+        """Handle emojis - extract sentiment and clean text.
 
         Args:
-            df: Input DataFrame
-            text_col: Name of text column
+            df: Input DataFrame.
+            text_col: Name of text column.
 
         Returns:
-            DataFrame with emoji features
+            DataFrame with emoji features.
         """
         logger.info("Processing emojis...")
 
@@ -401,7 +396,7 @@ class TextPreprocessor:
 
         # Simple emoji removal/replacement without external library
         def clean_emojis(text):
-            """Remove or replace emojis with simple text markers"""
+            """Remove or replace emojis with simple text markers."""
             try:
                 # Define common emoji to text mappings
                 emoji_replacements = {
@@ -454,17 +449,16 @@ class TextPreprocessor:
                                    text_col: str = "text_clean",
                                    target_languages: List[str] = ["en"],
                                    min_confidence: float = 0.5) -> DataFrame:
-        """
-        Detect language and optionally filter to specific languages.
+        """Detect language and optionally filter to specific languages.
 
         Args:
-            df: Input DataFrame
-            text_col: Column to analyze for language
-            target_languages: List of language codes to keep (e.g., ["en", "es"])
-            min_confidence: Minimum confidence threshold for language detection
+            df: Input DataFrame.
+            text_col: Column to analyze for language.
+            target_languages: List of language codes to keep (e.g., ["en", "es"]).
+            min_confidence: Minimum confidence threshold for language detection.
 
         Returns:
-            DataFrame with language detection results and optional filtering
+            DataFrame with language detection results and optional filtering.
         """
         logger.info(f"Detecting languages (filtering for: {target_languages})...")
 
@@ -499,25 +493,32 @@ class TextPreprocessor:
         return df
 
     def get_language_specific_stopwords(self, language: str) -> set:
-        """
-        TODO: Get stop words for specific languages.
+        """Get stop words for specific languages.
+        
         Args:
-            language: Language code (e.g., 'en', 'es', 'fr')
+            language: Language code (e.g., 'en', 'es', 'fr').
+            
         Returns:
-            Set of stop words for the language
+            Set of stop words for the language.
         """
-
+        if language == 'en':
+            return self.stop_words
+        elif language == 'es':
+            return {'el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se', 'no', 'haber', 'por', 'con', 'su'}
+        elif language == 'fr':
+            return {'le', 'de', 'un', 'être', 'et', 'à', 'il', 'avoir', 'ne', 'je', 'son', 'que', 'se', 'qui'}
+        else:
+            return self.stop_words  # Default to English
 
     def tokenize_text(self, df: DataFrame, text_col: str = "text_clean") -> DataFrame:
-        """
-        Tokenize text into words
+        """Tokenize text into words.
 
         Args:
-            df: Input DataFrame
-            text_col: Name of text column
+            df: Input DataFrame.
+            text_col: Name of text column.
 
         Returns:
-            DataFrame with tokenized text
+            DataFrame with tokenized text.
         """
         logger.info("Tokenizing text...")
 
@@ -542,15 +543,14 @@ class TextPreprocessor:
         return df
 
     def remove_stopwords(self, df: DataFrame, tokens_col: str = "tokens") -> DataFrame:
-        """
-        Remove stop words from tokenized text
+        """Remove stop words from tokenized text.
 
         Args:
-            df: Input DataFrame
-            tokens_col: Name of tokens column
+            df: Input DataFrame.
+            tokens_col: Name of tokens column.
 
         Returns:
-            DataFrame with stop words removed
+            DataFrame with stop words removed.
         """
         logger.info("Removing stop words...")
 
@@ -558,7 +558,7 @@ class TextPreprocessor:
         stop_words_broadcast = self.spark.sparkContext.broadcast(self.stop_words)
 
         def filter_stop_words(tokens):
-            """Filter out stop words"""
+            """Filter out stop words."""
             if tokens is None:
                 return []
             return [word for word in tokens if word.lower() not in stop_words_broadcast.value]
@@ -566,7 +566,7 @@ class TextPreprocessor:
         filter_stop_words_udf = udf(filter_stop_words, ArrayType(StringType()))
 
         df = df.withColumn(
-            "tokens_filtered",
+            f"{tokens_col}_filtered",
             filter_stop_words_udf(col(tokens_col))
         )
 
@@ -574,15 +574,14 @@ class TextPreprocessor:
         return df
 
     def lemmatize_tokens(self, df: DataFrame, tokens_col: str = "tokens_filtered") -> DataFrame:
-        """
-        Lemmatize tokens to their base form
+        """Lemmatize tokens to their base form
 
         Args:
             df: Input DataFrame
             tokens_col: Name of tokens column
 
         Returns:
-            DataFrame with lemmatized tokens
+            DataFrame with lemmatized tokens.
         """
         logger.info("Lemmatizing tokens...")
 
@@ -608,14 +607,13 @@ class TextPreprocessor:
         return df
 
     def create_processed_text(self, df: DataFrame) -> DataFrame:
-        """
-        Create final processed text from tokens
+        """Create final processed text from tokens.
 
         Args:
             df: Input DataFrame
 
         Returns:
-            DataFrame with processed text
+            DataFrame with processed text.
         """
         logger.info("Creating final processed text...")
 
@@ -634,14 +632,13 @@ class TextPreprocessor:
         return df
 
     def preprocess_pipeline(self, df: DataFrame) -> DataFrame:
-        """
-        Run complete preprocessing pipeline
+        """Run complete preprocessing pipeline.
 
         Args:
             df: Input DataFrame with 'text' column
 
         Returns:
-            DataFrame with all preprocessing steps applied
+            DataFrame with all preprocessing steps applied.
         """
         logger.info("Running complete preprocessing pipeline...")
 
@@ -671,8 +668,7 @@ class TextPreprocessor:
 
 
 def main():
-    """
-    Demonstrate preprocessing functionality
+    """Demonstrate preprocessing functionality.
     """
     from config.spark_config import create_spark_session
     from src.spark.data_ingestion import DataIngestion
