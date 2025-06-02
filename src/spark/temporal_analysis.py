@@ -56,8 +56,10 @@ def safe_ratio(numer, denom):
 
 
 class TemporalAnalyzer:
-    """Performs temporal analysis of sentiment data.
-    """def __init__(self, spark: SparkSession):."""Initialize temporal analyzer.
+    """Performs temporal analysis of sentiment data."""
+    
+    def __init__(self, spark: SparkSession):
+        """Initialize temporal analyzer.
 
         Args:
             spark: Active SparkSession

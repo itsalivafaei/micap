@@ -95,19 +95,21 @@ def create_feature_extraction_udf(features: List[str]):
 class CompetitorAnalyzer:
     """Enhanced competitor analysis with fork safety and comprehensive features.
     
-    Key capabilities:
-    - Fork-safe brand recognition
-    - Advanced sentiment momentum tracking
-    - Feature-level competitive analysis
-    - Market positioning insights
-    - Automated opportunity/threat detection
+    Features:
+    - Real-time competitor sentiment tracking
+    - Share of voice calculations  
+    - Sentiment momentum analysis
+    - Feature-specific sentiment analysis
     - Comprehensive visualizations.
-    ."""def __init__(self, spark: SparkSession, brand_recognizer=None):."""Initialize competitor analyzer.
+    """
+    
+    def __init__(self, spark: SparkSession, brand_recognizer=None):
+        """Initialize competitor analyzer.
         
         Args:
             spark: Active SparkSession
             brand_recognizer: Optional BrandRecognizer for driver-side operations.
-        ."""
+        """
         self.spark = spark
         self.brand_recognizer = brand_recognizer
         

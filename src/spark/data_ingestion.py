@@ -2,7 +2,7 @@
 
 Handles loading, validation, and partitioning of tweet data
 Optimized for local processing on M4 Mac.
-."""
+"""
 
 import os
 import sys
@@ -34,11 +34,14 @@ logger = logging.getLogger(__name__)
 class DataIngestion:
     """Handles data ingestion for sentiment analysis.
     Includes validation, cleaning, and partitioning.
-    ."""def __init__(self, spark: Optional[SparkSession] = None):."""Initialize DataIngestion with Spark session.
+    """
+    
+    def __init__(self, spark: Optional[SparkSession] = None):
+        """Initialize DataIngestion with Spark session.
 
         Args:
             spark: Optional SparkSession, creates new if not provided.
-        ."""
+        """
         self.spark = spark or create_spark_session("DataIngestion")
 
         # Define schema for Sentiment140 dataset
@@ -59,7 +62,7 @@ class DataIngestion:
 
         Returns:
             DataFrame: Loaded and initially processed data.
-        ."""
+        """
         logger.info(f"Loading data from: {file_path}")
 
         try:
@@ -113,7 +116,7 @@ class DataIngestion:
 
         Returns:
             Tuple of (cleaned DataFrame, quality metrics dict).
-        ."""
+        """
         logger.info("Starting data quality validation...")
 
         initial_count = df.count()
@@ -158,7 +161,7 @@ class DataIngestion:
 
         Returns:
             str: Path to partitioned data.
-        ."""
+        """
         logger.info(f"Partitioning data to: {output_path}")
 
         # For local development, we'll use fewer partitions
@@ -181,7 +184,7 @@ class DataIngestion:
             df: DataFrame to save
             path: Output path
             format: Output format (parquet, csv, json).
-        ."""
+        """
         logger.info(f"Saving data to {path} in {format} format")
 
         # Coalesce to reduce number of files for local storage
@@ -208,7 +211,7 @@ class DataIngestion:
 
         Returns:
             DataFrame: Balanced sampled data.
-        ."""
+        """
         logger.info(f"Creating balanced sample dataset with {sample_size * 100}% of data")
 
         # Check class distribution first
@@ -286,7 +289,7 @@ class DataIngestion:
             
         Returns:
             DataFrame: Balanced sample.
-        ."""
+        """
         logger.info(f"Creating balanced sample directly from file: {file_path}")
         
         try:
@@ -382,7 +385,7 @@ class DataIngestion:
 
 def main():
     """Main function to demonstrate data ingestion.
-    ."""
+    """
     # Initialize ingestion
     ingestion = DataIngestion()
 

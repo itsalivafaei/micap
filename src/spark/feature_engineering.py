@@ -32,17 +32,20 @@ logger = logging.getLogger(__name__)
 _sentiment_analyzer = None
 
 
-def _vader():
-    """Return one analyzer per executor (lazy-init)."""global _sentiment_analyzer.
+def get_sentiment_analyzer():
+    """Return one analyzer per executor (lazy-init)."""
+    global _sentiment_analyzer
+    
     if _sentiment_analyzer is None:
         _sentiment_analyzer = SentimentIntensityAnalyzer()
     return _sentiment_analyzer
 
 
-def get_vader_scores(text: str):
-    """Pure function used inside UDF."""if text is None:.
+def analyze_text_sentiment_pure(text):
+    """Pure function used inside UDF."""
+    if text is None:
         return [0.0, 0.0, 0.0, 0.0]
-    scores = _vader().polarity_scores(text)
+    scores = get_sentiment_analyzer().polarity_scores(text)
     return [
         float(scores["compound"]),
         float(scores["pos"]),
@@ -52,17 +55,17 @@ def get_vader_scores(text: str):
 
 
 # Pre-declare the UDF once so Spark can reuse it
-VADER_UDF = udf(get_vader_scores, ArrayType(DoubleType()))
+VADER_UDF = udf(analyze_text_sentiment_pure, ArrayType(DoubleType()))
 
 
 class FeatureEngineer:
     """Comprehensive feature engineering for sentiment analysis
-    FIXED: Uses lazy imports to avoid worker serialization issues.
-    ."""def __init__(self, spark: SparkSession):."""Initialize feature engineer
-
-        Args:
-            spark: Active SparkSession.
-        ."""self.spark = spark.
+    with optimizations for M4 Mac and distributed execution.
+    """
+    
+    def __init__(self, spark: SparkSession):
+        """Initialize feature engineer"""
+        self.spark = spark
 
         # Initialize sentiment analyzer
         self.vader = SentimentIntensityAnalyzer()
@@ -74,8 +77,9 @@ class FeatureEngineer:
 
     def _lazy_import_ml_features(self):
         """Lazy import of PySpark ML features to avoid serialization issues
-        This ensures imports happen within the Spark context.
-        ."""try:.
+        when using UDFs across executors.
+        """
+        try:
             from pyspark.ml.feature import (
                 HashingTF, IDF, Word2Vec, NGram,
                 CountVectorizer, StringIndexer
@@ -95,26 +99,28 @@ class FeatureEngineer:
             logger.error(f"Failed to import PySpark ML features: {e}")
             return None
 
-    def create_tfidf_features(self, df: DataFrame,
-                              text_col: str = "tokens_lemmatized",
-                              num_features: int = 1000) -> DataFrame:
+    def create_tfidf_features(self, df: DataFrame, 
+                             input_col: str = "tokens_lemmatized",
+                             output_col: str = "tfidf_features",
+                             vocab_size: int = 5000) -> DataFrame:
         """Create TF-IDF features from tokenized text with lazy imports
 
         Args:
             df: Input DataFrame
-            text_col: Column containing tokens
-            num_features: Number of TF-IDF features
+            input_col: Column containing tokens
+            output_col: Column to store TF-IDF features
+            vocab_size: Number of TF-IDF features
 
         Returns:
             DataFrame with TF-IDF features.
-        ."""
-        logger.info(f"Creating TF-IDF features with {num_features} dimensions...")
+        """
+        logger.info(f"Creating TF-IDF features with {vocab_size} dimensions...")
 
         # Lazy import ML features
         ml_imports = self._lazy_import_ml_features()
         if ml_imports is None:
             logger.error("Could not import ML features. Skipping TF-IDF.")
-            return df.withColumn("tfidf_features", lit(None))
+            return df.withColumn(output_col, lit(None))
 
         HashingTF = ml_imports['HashingTF']
         IDF = ml_imports['IDF']
@@ -130,14 +136,14 @@ class FeatureEngineer:
         try:
             # Configure TF-IDF pipeline
             hashingTF = HashingTF(
-                inputCol=text_col,
+                inputCol=input_col,
                 outputCol="raw_features",
-                numFeatures=num_features
+                numFeatures=vocab_size
             )
 
             idf = IDF(
                 inputCol="raw_features",
-                outputCol="tfidf_features",
+                outputCol=output_col,
                 minDocFreq=min_doc_freq
             )
 
@@ -151,48 +157,71 @@ class FeatureEngineer:
 
         except Exception as e:
             logger.error(f"TF-IDF creation failed: {e}")
-            return df.withColumn("tfidf_features", lit(None))
+            return df.withColumn(output_col, lit(None))
 
-    def extract_ngram_features(self, df: DataFrame,
-                               tokens_col: str = "tokens_lemmatized",
-                               n_values: List[int] = [2, 3]) -> DataFrame:
+    def create_ngram_features(self, df: DataFrame,
+                             input_col: str = "tokens_lemmatized",
+                             output_col: str = "ngram_features",
+                             n: int = 2) -> DataFrame:
         """Extract n-gram features with lazy imports.
-        ."""
-        logger.info(f"Extracting n-gram features for n={n_values}...")
+
+        Args:
+            df: Input DataFrame
+            input_col: Column containing tokens
+            output_col: Column to store n-gram features
+            n: N-gram size
+
+        Returns:
+            DataFrame with n-gram features.
+        """
+        logger.info(f"Extracting {n}-gram features...")
 
         ml_imports = self._lazy_import_ml_features()
         if ml_imports is None:
             logger.error("Could not import ML features. Skipping n-grams.")
             # Add dummy n-gram columns
-            for n in n_values:
-                df = df.withColumn(f"{n}grams", lit(None)) \
-                    .withColumn(f"{n}gram_count", lit(0))
+            df = df.withColumn(f"{n}grams", lit(None)) \
+                .withColumn(f"{n}gram_count", lit(0))
             return df
 
         NGram = ml_imports['NGram']
 
         try:
-            for n in n_values:
-                ngram = NGram(n=n, inputCol=tokens_col, outputCol=f"{n}grams")
-                df = ngram.transform(df)
-                df = df.withColumn(f"{n}gram_count", size(col(f"{n}grams")))
+            ngram = NGram(n=n, inputCol=input_col, outputCol=output_col)
+            df = ngram.transform(df)
+            df = df.withColumn(f"{n}gram_count", size(col(f"{n}grams")))
 
-            logger.info("N-gram extraction completed")
+            logger.info(f"{n}-gram extraction completed")
             return df
 
         except Exception as e:
-            logger.error(f"N-gram extraction failed: {e}")
+            logger.error(f"{n}-gram extraction failed: {e}")
             # Add dummy columns
-            for n in n_values:
-                df = df.withColumn(f"{n}grams", lit(None)) \
-                    .withColumn(f"{n}gram_count", lit(0))
+            df = df.withColumn(f"{n}grams", lit(None)) \
+                .withColumn(f"{n}gram_count", lit(0))
             return df
 
-    def generate_word_embeddings_optimized(self, df: DataFrame,
-                                         tokens_col: str = "tokens_lemmatized",
-                                         vector_size: int = 100) -> DataFrame:
+    def create_word2vec_features(self, df: DataFrame,
+                                input_col: str = "tokens_lemmatized",
+                                output_col: str = "word2vec_features",
+                                vector_size: int = 100,
+                                min_count: int = 5,
+                                checkpoint_interval: int = 10,
+                                checkpoint_dir: str = None) -> DataFrame:
         """Generate Word2Vec embeddings with memory optimization and checkpointing.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            input_col: Column containing tokens
+            output_col: Column to store Word2Vec features
+            vector_size: Word2Vec embedding size
+            min_count: Minimum word count for Word2Vec training
+            checkpoint_interval: Checkpoint interval for Word2Vec training
+            checkpoint_dir: Checkpoint directory for Word2Vec training
+
+        Returns:
+            DataFrame with Word2Vec features.
+        """
         logger.info(f"Generating optimized Word2Vec embeddings with size {vector_size}...")
 
         ml_imports = self._lazy_import_ml_features()
@@ -209,30 +238,28 @@ class FeatureEngineer:
 
         try:
             # Checkpoint the data to disk to break lineage
-            checkpoint_dir = str(get_path("data/checkpoints/word2vec"))
+            if checkpoint_dir is None:
+                checkpoint_dir = str(get_path("data/checkpoints/word2vec"))
             os.makedirs(checkpoint_dir, exist_ok=True)
             self.spark.sparkContext.setCheckpointDir(checkpoint_dir)
             
             # Filter and checkpoint data
-            df_filtered = df.filter(size(col(tokens_col)) > 0)
+            df_filtered = df.filter(size(col(input_col)) > 0)
             df_filtered.checkpoint()
             
             # Count vocabulary more efficiently
-            vocab_sample = df_filtered.sample(0.1).select(explode(col(tokens_col)).alias("word"))
+            vocab_sample = df_filtered.sample(0.1).select(explode(col(input_col)).alias("word"))
             estimated_vocab = vocab_sample.distinct().count() * 10
             logger.info(f"Estimated vocabulary size: {estimated_vocab} unique words")
 
             # Dynamic parameter adjustment based on data size
             if row_count < 100:
-                min_count = 1
                 max_iter = 3
                 window_size = 3
             elif row_count < 1000:
-                min_count = 2
                 max_iter = 5
                 window_size = 4
             else:
-                min_count = max(2, row_count // 1000)
                 max_iter = min(10, max(3, row_count // 100))
                 window_size = 5
 
@@ -242,8 +269,8 @@ class FeatureEngineer:
             word2vec = Word2Vec(
                 vectorSize=vector_size,
                 minCount=min_count,
-                inputCol=tokens_col,
-                outputCol="word2vec_features",
+                inputCol=input_col,
+                outputCol=output_col,
                 windowSize=window_size,
                 maxIter=max_iter,
                 seed=42,
@@ -279,17 +306,27 @@ class FeatureEngineer:
         except Exception as e:
             logger.warning(f"Word2Vec training failed after all attempts: {e}. Using dummy embeddings.")
             df.unpersist()
-            return self._create_dummy_embeddings(df, vector_size)
+            return self._create_dummy_embeddings(df, vector_size, output_col)
 
-    def _create_dummy_embeddings(self, df: DataFrame, vector_size: int) -> DataFrame:
-        """Create dummy zero embeddings when Word2Vec fails."""dummy_vector = [0.0] * vector_size.
-        return df.withColumn("word2vec_features",
+    def _create_dummy_embeddings(self, df: DataFrame, vector_size: int, output_col: str = "word2vec_features") -> DataFrame:
+        """Create dummy zero embeddings when Word2Vec fails."""
+        dummy_vector = [0.0] * vector_size
+        return df.withColumn(output_col,
                              lit(dummy_vector).cast(ArrayType(DoubleType())))
 
-    def extract_lexicon_features(self, df: DataFrame,
-                                 text_col: str = "text") -> DataFrame:
+    def extract_sentiment_features(self, df: DataFrame, 
+                                  text_col: str = "text",
+                                  output_col: str = "sentiment_features") -> DataFrame:
         """Extract sentiment lexicon features using VADER.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            text_col: Column containing text
+            output_col: Column to store sentiment features
+
+        Returns:
+            DataFrame with sentiment features.
+        """
         logger.info("Extracting sentiment lexicon features...")
 
         try:
@@ -314,9 +351,19 @@ class FeatureEngineer:
                 .withColumn("vader_negative", lit(0.0)) \
                 .withColumn("vader_neutral", lit(1.0))
 
-    def extract_temporal_features(self, df: DataFrame) -> DataFrame:
+    def extract_temporal_features(self, df: DataFrame,
+                                 timestamp_col: str = "timestamp",
+                                 output_col: str = "temporal_features") -> DataFrame:
         """Extract temporal features from timestamp.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            timestamp_col: Column containing timestamp
+            output_col: Column to store temporal features
+
+        Returns:
+            DataFrame with temporal features.
+        """
         logger.info("Extracting temporal features...")
 
         try:
@@ -360,9 +407,19 @@ class FeatureEngineer:
                 .withColumn("is_weekend", lit(0)) \
                 .withColumn("time_of_day", lit("unknown"))
 
-    def extract_text_statistics(self, df: DataFrame) -> DataFrame:
+    def extract_statistical_features(self, df: DataFrame,
+                                    text_col: str = "text",
+                                    output_col: str = "statistical_features") -> DataFrame:
         """Extract statistical features from text.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            text_col: Column containing text
+            output_col: Column to store statistical features
+
+        Returns:
+            DataFrame with statistical features.
+        """
         logger.info("Extracting text statistics...")
 
         try:
@@ -404,9 +461,21 @@ class FeatureEngineer:
                 .withColumn("uppercase_ratio", lit(0.0)) \
                 .withColumn("punctuation_density", lit(0.0))
 
-    def create_all_features(self, df: DataFrame) -> DataFrame:
+    def create_feature_pipeline(self, df: DataFrame,
+                               include_word2vec: bool = True,
+                               include_ngrams: bool = True,
+                               vocab_size: int = 5000) -> DataFrame:
         """Create all features using the complete pipeline with error handling.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            include_word2vec: Whether to include Word2Vec features
+            include_ngrams: Whether to include n-gram features
+            vocab_size: Number of TF-IDF features
+
+        Returns:
+            DataFrame with all features.
+        """
         logger.info("Creating all features...")
 
         # Log dataset info
@@ -415,13 +484,15 @@ class FeatureEngineer:
 
         # Apply all feature extraction methods with error handling
         try:
-            df = self.extract_text_statistics(df)
+            df = self.extract_statistical_features(df)
             df = self.extract_temporal_features(df)
-            df = self.extract_lexicon_features(df)
-            df = self.extract_entity_features(df)  # Add this line
-            df = self.extract_ngram_features(df)
-            df = self.create_tfidf_features(df, num_features=self.tfidf_features)
-            df = self.generate_word_embeddings_optimized(df, vector_size=self.word2vec_size)
+            df = self.extract_sentiment_features(df)
+            df = self.extract_entity_features(df)
+            if include_ngrams:
+                df = self.create_ngram_features(df)
+            df = self.create_tfidf_features(df, vocab_size=vocab_size)
+            if include_word2vec:
+                df = self.create_word2vec_features(df, vector_size=self.word2vec_size)
 
             # Update feature summary to include entity features
             feature_cols = [
@@ -431,9 +502,9 @@ class FeatureEngineer:
                 "vader_compound", "vader_positive", "vader_negative", "vader_neutral",
                 "hour_sin", "hour_cos", "is_weekend",
                 "2gram_count", "3gram_count",
-                "brand_count", "category_count", "has_competitor_comparison",  # Add these
-                "has_apple", "has_samsung", "has_google", "has_microsoft",  # Add these
-                "has_amazon", "has_tesla"  # Add these
+                "brand_count", "category_count", "has_competitor_comparison",
+                "has_apple", "has_samsung", "has_google", "has_microsoft",
+                "has_amazon", "has_tesla"
             ]
 
             logger.info(f"Created {len(feature_cols)} basic features + TF-IDF + Word2Vec")
@@ -444,9 +515,16 @@ class FeatureEngineer:
             logger.error(f"Feature creation failed: {e}")
             raise
 
-    def save_feature_stats(self, df: DataFrame, output_path: str):
+    def calculate_feature_statistics(self, df: DataFrame, output_path: str = None) -> Dict:
         """Calculate and save feature statistics with error handling.
-        ."""
+
+        Args:
+            df: Input DataFrame
+            output_path: Path to save feature statistics
+
+        Returns:
+            Dictionary with feature statistics.
+        """
         logger.info("Calculating feature statistics...")
 
         try:
@@ -468,14 +546,15 @@ class FeatureEngineer:
                 stats_df = df.select(existing_cols).describe()
 
             # Save statistics
-            stats_df.coalesce(1).write.mode("overwrite").json(output_path)
-            logger.info(f"Feature statistics saved to: {output_path}")
-            return stats_df
+            if output_path:
+                stats_df.coalesce(1).write.mode("overwrite").json(output_path)
+                logger.info(f"Feature statistics saved to: {output_path}")
+            return stats_df.toPandas().to_dict()
 
         except Exception as e:
             logger.warning(f"Could not save statistics: {e}")
             stats_data = [("error", str(e))]
-            return self.spark.createDataFrame(stats_data, ["summary", "message"])
+            return {"error": str(e)}
 
     def extract_entity_features(self, df: DataFrame,
                                 text_col: str = "text") -> DataFrame:
@@ -488,7 +567,7 @@ class FeatureEngineer:
 
         Returns:
             DataFrame with entity features.
-        ."""
+        """
         logger.info("Extracting named entity features...")
 
         try:
@@ -513,7 +592,8 @@ class FeatureEngineer:
 
             # UDF to extract brand mentions
             def extract_brands(text):
-                """Extract brand mentions from text."""if not text:.
+                """Extract brand mentions from text."""
+                if not text:
                     return []
 
                 text_lower = text.lower()
@@ -531,7 +611,8 @@ class FeatureEngineer:
 
             # UDF to count brand mentions
             def count_brand_mentions(text):
-                """Count total brand mentions in text."""if not text:.
+                """Count total brand mentions in text."""
+                if not text:
                     return 0
 
                 text_lower = text.lower()
@@ -547,7 +628,8 @@ class FeatureEngineer:
 
             # Pattern-based entity extraction for product categories
             def extract_product_categories(text):
-                """Extract product category mentions."""if not text:.
+                """Extract product category mentions."""
+                if not text:
                     return []
 
                 text_lower = text.lower()
@@ -595,7 +677,8 @@ class FeatureEngineer:
 
             # Add competitor co-mention feature
             def has_competitor_mentions(brands):
-                """Check if multiple competing brands are mentioned."""if not brands or len(brands) < 2:.
+                """Check if multiple competing brands are mentioned."""
+                if not brands or len(brands) < 2:
                     return 0
 
                 # Define competitor groups
@@ -636,7 +719,8 @@ class FeatureEngineer:
 
     def can_train_word2vec(self, df: DataFrame, tokens_col: str = "tokens_lemmatized") -> bool:
         """Check if Word2Vec training is feasible given memory constraints.
-        ."""try:.
+        """
+        try:
             # Get system info
             import psutil
             available_memory_gb = psutil.virtual_memory().available / (1024**3)
@@ -668,7 +752,7 @@ class FeatureEngineer:
 
 def main():
     """Demonstrate feature engineering functionality.
-    ."""
+    """
     from config.spark_config import create_spark_session
 
     # Create Spark session
@@ -684,7 +768,7 @@ def main():
         feature_engineer = FeatureEngineer(spark)
 
         # Create features
-        df_features = feature_engineer.create_all_features(df)
+        df_features = feature_engineer.create_feature_pipeline(df)
 
         # Save featured data
         output_path = str(get_path("data/processed/sentiment140_sample"))
@@ -693,7 +777,7 @@ def main():
 
         # Save feature statistics
         stats_path = str(get_path("data/processed/feature_statistics"))
-        feature_engineer.save_feature_stats(df_features, stats_path)
+        feature_engineer.calculate_feature_statistics(df_features, stats_path)
 
     except Exception as e:
         logger.error(f"Feature engineering demo failed: {e}")

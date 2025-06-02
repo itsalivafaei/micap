@@ -44,7 +44,8 @@ class DeepLearningModel:
             spark: SparkSession instance.
             max_words: Maximum vocabulary size.
             max_length: Maximum sequence length.
-        """self.spark = spark.
+        """
+        self.spark = spark
         self.max_words = max_words
         self.max_length = max_length
         self.tokenizer = Tokenizer(num_words=max_words)
@@ -62,7 +63,8 @@ class DeepLearningModel:
 
         Returns:
             Pandas DataFrame.
-        """# Use toLocalIterator() which returns one row at a time.
+        """
+        # Use toLocalIterator() which returns one row at a time.
         # Then batch them manually for efficiency
         iterator = df.toLocalIterator()
 
@@ -125,7 +127,10 @@ class DeepLearningModel:
 
 
 class LSTMModel(DeepLearningModel):
-    """LSTM model for sentiment analysis."""def build_model(self, embedding_dim: int = 128) -> models.Model:."""Build LSTM model architecture.
+    """LSTM model for sentiment analysis."""
+    
+    def build_model(self, embedding_dim: int = 128) -> models.Model:
+        """Build LSTM model architecture.
 
         Args:
             embedding_dim: Dimension of word embeddings.
@@ -196,7 +201,10 @@ class LSTMModel(DeepLearningModel):
 
 
 class CNNModel(DeepLearningModel):
-    """CNN model for sentiment analysis."""def build_model(self, embedding_dim: int = 128) -> models.Model:."""Build CNN model architecture.
+    """CNN model for sentiment analysis."""
+    
+    def build_model(self, embedding_dim: int = 128) -> models.Model:
+        """Build CNN model architecture.
 
         Args:
             embedding_dim: Dimension of word embeddings.

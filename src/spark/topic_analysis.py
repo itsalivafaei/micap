@@ -38,12 +38,14 @@ logger = logging.getLogger(__name__)
 
 
 class TopicAnalyzer:
-    """Performs topic modeling and analysis on sentiment data.
-    ."""def __init__(self, spark: SparkSession):."""Initialize topic analyzer.
+    """Performs topic modeling and analysis on sentiment data."""
+    
+    def __init__(self, spark: SparkSession):
+        """Initialize topic analyzer.
 
         Args:
             spark: Active SparkSession.
-        ."""
+        """
         self.spark = spark
 
         # Extended stop words

@@ -14,7 +14,7 @@ Usage:
     config_file = get_config_path('settings.json')
 
     # Get absolute paths
-    abs_path = get_absolute_path('relative', 'path', 'to', 'file.txt').
+    abs_path = get_absolute_path('relative', 'path', 'to', 'file.txt')
 """
 
 import os
@@ -26,8 +26,8 @@ import sys
 class ProjectPathManager:
     """Manages project paths and provides utilities for path calculations."""
     def __init__(self):
-
-        """Initialize the class."""        self._project_root = None
+        """Initialize the class."""
+        self._project_root = None
         self._find_project_root()
 
     def _find_project_root(self) -> None:
@@ -38,7 +38,8 @@ class ProjectPathManager:
         - setup.py, pyproject.toml, requirements.txt
         - src/ directory
         - Any directory containing this utils folder.
-        """# Start from this file's directory.
+        """
+        # Start from this file's directory.
         current_path = Path(__file__).resolve().parent.parent.parent
 
         # Common project root indicators
@@ -73,7 +74,8 @@ class ProjectPathManager:
 
     @property
     def project_root(self) -> Path:
-        """Get the project root directory."""return self._project_root.
+        """Get the project root directory."""
+        return self._project_root
 
     def get_path(self, *path_parts: str) -> Path:
         """Get a path relative to the project root.
@@ -86,7 +88,8 @@ class ProjectPathManager:
 
         Example:
             get_path('data', 'input.csv') -> project_root/data/input.csv.
-        """return self._project_root / Path(*path_parts).
+        """
+        return self._project_root / Path(*path_parts)
 
     def get_absolute_path(self, *path_parts: str) -> Path:
         """Get absolute path relative to project root.
@@ -96,7 +99,8 @@ class ProjectPathManager:
 
         Returns:
             Absolute Path object.
-        """return self.get_path(*path_parts).resolve().
+        """
+        return self.get_path(*path_parts).resolve()
 
     def get_relative_path(self, target_path: Union[str, Path],
                           from_path: Optional[Union[str, Path]] = None) -> Path:
@@ -108,7 +112,8 @@ class ProjectPathManager:
 
         Returns:
             Relative path from source to target.
-        """target = self.get_absolute_path(target_path) if isinstance(target_path, str) else Path(target_path).resolve().
+        """
+        target = self.get_absolute_path(target_path) if isinstance(target_path, str) else Path(target_path).resolve()
 
         if from_path is None:
             from_path = Path.cwd()
@@ -125,12 +130,14 @@ class ProjectPathManager:
 
         Returns:
             Path object of the created/existing directory.
-        """dir_path = self.get_path(*path_parts).
+        """
+        dir_path = self.get_path(*path_parts)
         dir_path.mkdir(parents=True, exist_ok=True)
         return dir_path
 
     def file_exists(self, *path_parts: str) -> bool:
-        """Check if file exists relative to project root."""return self.get_path(*path_parts).exists().
+        """Check if file exists relative to project root."""
+        return self.get_path(*path_parts).exists()
 
     def list_files(self, *path_parts: str, pattern: str = "*") -> list:
         """List files in directory relative to project root.
@@ -141,7 +148,8 @@ class ProjectPathManager:
 
         Returns:
             List of Path objects.
-        """dir_path = self.get_path(*path_parts).
+        """
+        dir_path = self.get_path(*path_parts)
         if dir_path.exists() and dir_path.is_dir():
             return list(dir_path.glob(pattern))
         return []
@@ -153,53 +161,65 @@ _path_manager = ProjectPathManager()
 
 # Convenience functions for easy importing
 def get_project_root() -> Path:
-    """Get the project root directory."""return _path_manager.project_root.
+    """Get the project root directory."""
+    return _path_manager.project_root
 
 
 def get_path(*path_parts: str) -> Path:
-    """Get path relative to project root."""return _path_manager.get_path(*path_parts).
+    """Get path relative to project root."""
+    return _path_manager.get_path(*path_parts)
 
 
 def get_absolute_path(*path_parts: str) -> Path:
-    """Get absolute path relative to project root."""return _path_manager.get_absolute_path(*path_parts).
+    """Get absolute path relative to project root."""
+    return _path_manager.get_absolute_path(*path_parts)
 
 
 def get_relative_path(target_path: Union[str, Path],
                       from_path: Optional[Union[str, Path]] = None) -> Path:
-    """Get relative path between two locations."""return _path_manager.get_relative_path(target_path, from_path).
+    """Get relative path between two locations."""
+    return _path_manager.get_relative_path(target_path, from_path)
 
 
 def ensure_dir(*path_parts: str) -> Path:
-    """Ensure directory exists."""return _path_manager.ensure_dir(*path_parts).
+    """Ensure directory exists."""
+    return _path_manager.ensure_dir(*path_parts)
 
 
 def file_exists(*path_parts: str) -> bool:
-    """Check if file exists."""return _path_manager.file_exists(*path_parts).
+    """Check if file exists."""
+    return _path_manager.file_exists(*path_parts)
 
 
 def list_files(*path_parts: str, pattern: str = "*") -> list:
-    """List files in directory."""return _path_manager.list_files(*path_parts, pattern=pattern).
+    """List files in directory."""
+    return _path_manager.list_files(*path_parts, pattern=pattern)
 
 
 # Common directory shortcuts
 def get_data_path(*path_parts: str) -> Path:
-    """Get path in data directory."""return get_path('data', *path_parts).
+    """Get path in data directory."""
+    return get_path('data', *path_parts)
 
 
 def get_config_path(*path_parts: str) -> Path:
-    """Get path in config directory."""return get_path('config', *path_parts).
+    """Get path in config directory."""
+    return get_path('config', *path_parts)
 
 
 def get_src_path(*path_parts: str) -> Path:
-    """Get path in src directory."""return get_path('src', *path_parts).
+    """Get path in src directory."""
+    return get_path('src', *path_parts)
 
 
 def get_tests_path(*path_parts: str) -> Path:
-    """Get path in tests directory."""return get_path('tests', *path_parts).
+    """Get path in tests directory."""
+    return get_path('tests', *path_parts)
 
 
 def get_output_path(*path_parts: str) -> Path:
-    """Get path in output directory."""return get_path('output', *path_parts).
+    """Get path in output directory."""
+    return get_path('output', *path_parts)
 
 
 def get_assets_path(*path_parts: str) -> Path:

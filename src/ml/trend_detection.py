@@ -30,12 +30,16 @@ logger = logging.getLogger(__name__)
 
 
 class TopicModeler:
-    """Implements LDA topic modeling for trend detection."""def __init__(self, spark: SparkSession, num_topics: int = 20):."""Initialize topic modeler.
+    """Implements LDA topic modeling for trend detection."""
+    
+    def __init__(self, spark: SparkSession, num_topics: int = 20):
+        """Initialize topic modeler.
 
         Args:
             spark: Active SparkSession
             num_topics: Number of topics to extract.
-        ."""self.spark = spark.
+        ."""
+        self.spark = spark
         self.num_topics = num_topics
         self.model = None
         self.vocabulary = None
@@ -202,8 +206,11 @@ class TopicModeler:
 
 
 class TrendForecaster:
-    """Forecasts sentiment and mention trends using Prophet.
-    ."""def __init__(self, spark: SparkSession):."""Initialize trend forecaster."""self.spark = spark.
+    """Forecasts future sentiment trends using time series analysis."""
+    
+    def __init__(self, spark: SparkSession):
+        """Initialize trend forecaster."""
+        self.spark = spark
         self.models = {}
 
     def forecast_brand_sentiment(self, df: pd.DataFrame,
@@ -446,8 +453,10 @@ class TrendForecaster:
 
 
 class AnomalyDetector:
-    """Detects anomalies in sentiment patterns.
-    ."""def __init__(self, spark: SparkSession, contamination: float = 0.05):."""Initialize anomaly detector.
+    """Detects anomalies in sentiment patterns using statistical methods."""
+    
+    def __init__(self, spark: SparkSession, contamination: float = 0.05):
+        """Initialize anomaly detector.
 
         Args:
             contamination: Expected proportion of anomalies.
@@ -564,8 +573,10 @@ class AnomalyDetector:
 
 
 class ViralityPredictor:
-    """Predicts viral potential of content.
-    ."""def __init__(self, spark: SparkSession):."""Initialize virality predictor.
+    """Predicts tweet virality potential based on early engagement signals."""
+    
+    def __init__(self, spark: SparkSession):
+        """Initialize virality predictor.
 
         Args:
             spark: Active SparkSession.
