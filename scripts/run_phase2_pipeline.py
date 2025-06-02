@@ -1,9 +1,4 @@
-"""Phase 2 Pipeline Runner - Brand Recognition and Competitor Analysis.
-
-Executes brand/competitor detection and competitive analysis
-Author: AI Assistant
-Date: 2024.
-"""
+"""Phase 2 Pipeline Runner - Brand Recognition and Competitor Analysis."""
 
 import os
 import sys

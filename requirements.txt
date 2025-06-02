@@ -26,4 +26,18 @@ statsmodels~=0.14.4
 prophet~=1.1.6
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.21.1  # For faster fuzzy matching
-PyYAML>=6.0.2  # Ensure Python 3.11 compatibility
+PyYAML==6.0.2  # Pin to stable version for Python 3.11 compatibility
+
+# FastAPI and Web Dependencies
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+gunicorn>=21.0.0
+pydantic>=2.11.0
+starlette>=0.46.0
+httpx>=0.28.0
+
+# Additional production dependencies
+psycopg2-binary>=2.9.0  # PostgreSQL support
+redis>=5.0.0  # Redis support
+sqlalchemy>=2.0.0  # Database ORM
+alembic>=1.16.0  # Database migrations

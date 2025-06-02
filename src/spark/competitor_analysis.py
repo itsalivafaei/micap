@@ -1,9 +1,7 @@
 """Enhanced Competitor Analysis Module for MICAP.
 
-Combines fork safety with comprehensive competitive intelligence features
-Author: AI Assistant (Enhanced Hybrid Version)
-Date: 2024.
-."""
+Combines fork safety with comprehensive competitive intelligence features.
+"""
 
 import os
 import logging

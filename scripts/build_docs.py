@@ -29,8 +29,8 @@ sys.path.insert(0, os.path.abspath('../src'))
 
 # Project information
 project = 'MICAP'
-copyright = '2025, MICAP Team'
-author = 'MICAP Team'
+copyright = '2025, Ali Vafaei'
+author = 'Ali Vafaei'
 release = '1.0'
 version = '1.0'
 

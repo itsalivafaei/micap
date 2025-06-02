@@ -10,42 +10,143 @@ env/
 dist/
 build/
 
+# Virtual Environments
+.env
+.env.local
+.venv/
+.venv2/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
 # Spark
 spark-warehouse/
 metastore_db/
 derby.log
 
 # Data
-data/
+# data/
+data/processed/
+data/raw/
+data/models/
+data/checkpoints/*/
+*.csv
+*.parquet
+*.json.gz
 
-
-# Models
+# ML Models and Artifacts
 *.pkl
 *.h5
 *.model
+*.pt
+*.pth
+*.ckpt
+*.joblib
+artifacts/
+models/
+checkpoints/
 
 # Logs
 logs/
 *.log
+mlruns/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-*
+.spyderproject
+.spyproject
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-
-# Environment
-.env
-.env.local
-.venv
-.venv2
 
 # Jupyter
 .ipynb_checkpoints/
+*.ipynb_checkpoints
 
-# Shell Scripts
+# Shell Scripts and Temporary Files
 shell/*
+tmp/
+temp/
+.tmp/
+
+# Cursor
+.cursor/
+.cursorignore
+cursor_reports/
+
+# Artifacts and Cache Directories
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Docker and Containers
+.docker/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets and Security
+.env.production
+.env.staging
+secrets/
+*.pem
+*.key
+*.crt
+
+# Large files that shouldn't be in git
+*.zip
+*.tar.gz
+*.tar.bz2
+*.7z
+*.rar
+
+# System files
+*.swp
+*.swo
+*~
+.directory
+
+# Test outputs
+test-results/
+coverage-reports/
+pytest_cache/
+
+# Documentation build
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Package management
+Pipfile.lock
+poetry.lock
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json

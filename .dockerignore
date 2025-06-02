@@ -1,5 +1,6 @@
-# Docker ignore file for MICAP
-# Excludes files and directories from Docker build context
+# =====================================
+# MICAP Docker Ignore - Production Optimized
+# =====================================
 
 # Development and IDE files
 .vscode/
@@ -7,10 +8,17 @@
 *.swp
 *.swo
 *~
+*.sublime-*
+.spyderproject
+.spyproject
+.cursor/
+.cursorignore
 
-# Git files
+# Git files (never needed in containers)
 .git/
 .gitignore
+.gitattributes
+.github/
 
 # Python cache and compiled files
 __pycache__/
@@ -38,111 +46,88 @@ MANIFEST
 
 # Virtual environments
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
-.virtualenv
+.virtualenv/
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
+# Testing and CI files
+.pytest_cache/
+.coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
 .cache
 nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
-.pytest_cache/
-cover/
+tests/
+test-results/
+coverage-reports/
 
-# Documentation
-docs/_build/
-.readthedocs.yml
+# Documentation files (not needed in runtime)
+docs/
+*.md
+*.rst
+CHANGELOG*
+CONTRIBUTING*
+LICENSE*
+AUTHORS*
+HISTORY*
+README*
+cursor_reports/
 
 # Jupyter Notebook
-.ipynb_checkpoints
+.ipynb_checkpoints/
+notebooks/
+*.ipynb
 
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# poetry
-poetry.lock
-
-# celery beat schedule file
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
+# Development configuration
+.env.example
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.development*
+.env.test*
+.gitignore
+.pre-commit-config.yaml
+.editorconfig
+.pylintrc
+setup.cfg
+mypy.ini
+pytest.ini
+tox.ini
+# requirements-dev.txt  # Commented out for Docker build
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# ML/Data specific files
+# ML/Data specific files (exclude large data)
+data/raw/
+data/processed/
+data/models/
+data/checkpoints/
+*.csv
+*.json
+*.parquet
+*.tsv
 *.h5
 *.pkl
 *.joblib
-models/
-checkpoints/
-*.ckpt
 *.pth
 *.pt
+*.ckpt
+mlruns/
+mlartifacts/
+artifacts/
 
 # Spark specific
 metastore_db/
 derby.log
 spark-warehouse/
 
-# Data files (exclude from image)
-data/raw/
-data/processed/
-data/models/
-*.csv
-*.json
-*.parquet
-*.tsv
-*.txt
-
-# Logs
+# Logs (runtime will generate its own)
 logs/
 *.log
 
@@ -160,58 +145,76 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-artifacts/
-benchmarks/
-reports/
-outputs/
+# Development scripts and tools
+scripts/setup_*
+scripts/dev_*
+scripts/benchmark_*
+scripts/check_*
+Makefile
 
 # CI/CD files (not needed in runtime)
 .github/
 .pre-commit-config.yaml
-Makefile
+.codecov.yml
+.travis.yml
+.appveyor.yml
+sonar-project.properties
 
-# Documentation files
-README.md
-CONTRIBUTING.md
-CHANGELOG.md
-LICENSE
-*.md
-
-# Configuration files for development
-docker-compose.yml
-docker-compose.*.yml
+# Docker files (avoid recursive copying)
+Dockerfile*
+docker-compose*.yml
 .dockerignore
-Dockerfile
 
 # Security and secrets
-.env.example
 secrets/
 *.pem
 *.key
+*.crt
+.env.production
+.env.staging
 
 # Backup files
 *.bak
 *.backup
+*.orig
 
 # Editor temporary files
 .vscode/
 .idea/
-*.sublime-*
 
-# Node.js (if any frontend assets)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Package management lock files (we use requirements.txt)
+Pipfile.lock
+poetry.lock
+package-lock.json
+yarn.lock
 
-# Archive files
+# Large archives
 *.zip
 *.tar.gz
+*.tar.bz2
+*.7z
 *.rar
 
-# Large binary files
-*.bin
-*.exe
-*.dmg
-*.iso 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
+
+# Shell utilities
+shell/
+
+# Development monitoring
+cursor_reports/
+.cursor/
+
+# Keep only what's needed for production:
+# - src/ (application code)
+# - config/ (production configs only)
+# - requirements.txt (dependencies)
+# - pyproject.toml (package metadata)
+# - setup.py (if needed for installation) 

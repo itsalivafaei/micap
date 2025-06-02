@@ -1,18 +1,18 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel", "setuptools-scm"]
+requires = ["wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "micap"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Market Intelligence & Competitor Analysis Platform"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "MICAP Team", email = "team@micap.io"}
+    {name = "Ali Vafaei", email = "beady_stats.38@icloud.com"}
 ]
 maintainers = [
-    {name = "MICAP Team", email = "team@micap.io"}
+    {name = "Ali Vafaei", email = "beady_stats.38@icloud.com"}
 ]
 keywords = ["sentiment analysis", "machine learning", "market intelligence", "nlp", "spark"]
 classifiers = [
@@ -94,9 +94,6 @@ Documentation = "https://micap.readthedocs.io"
 micap-train = "src.scripts.train_all_models:main"
 micap-pipeline = "src.scripts.run_phase1_pipeline:main"
 micap-api = "src.api.main:main"
-
-[tool.setuptools_scm]
-write_to = "src/_version.py"
 
 [tool.setuptools.packages.find]
 where = ["src"]

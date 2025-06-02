@@ -22,10 +22,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-v2-
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pydocstyle interrogate
+          chmod +x .github/scripts/install_dependencies.sh
+          export INSTALL_DEV=false
+          export DOWNLOAD_SPACY=false
+          ./.github/scripts/install_dependencies.sh "pydocstyle interrogate"
 
       - name: Check docstring coverage
         run: |
@@ -54,24 +64,99 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-v2-
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints myst-parser
+          chmod +x .github/scripts/install_dependencies.sh
+          export INSTALL_DEV=false
+          export DOWNLOAD_SPACY=false
+          ./.github/scripts/install_dependencies.sh "sphinx sphinx-rtd-theme sphinx-autodoc-typehints myst-parser"
 
-      - name: Create docs directory
+      - name: Prepare docs directory
         run: |
-          mkdir -p docs
+          # Remove existing docs if present
+          if [ -d "docs" ]; then
+            echo "Cleaning existing docs directory..."
+            rm -rf docs/*
+          else
+            echo "Creating docs directory..."
+            mkdir -p docs
+          fi
+
+      - name: Initialize Sphinx documentation
+        run: |
           sphinx-quickstart docs --quiet --project="MICAP" \
             --author="MICAP Team" --release="1.0" --language="en" \
             --extensions="sphinx.ext.autodoc,sphinx.ext.viewcode,sphinx.ext.napoleon,sphinx_rtd_theme"
 
+      - name: Configure Sphinx
+        run: |
+          cd docs
+          # Update conf.py for better documentation
+          cat >> conf.py << 'EOF'
+          
+          # MICAP-specific configuration
+          import os
+          import sys
+          sys.path.insert(0, os.path.abspath('../src'))
+          
+          # Theme configuration
+          html_theme = 'sphinx_rtd_theme'
+          html_theme_options = {
+              'navigation_depth': 4,
+              'collapse_navigation': False,
+              'sticky_navigation': True,
+              'includehidden': True,
+              'titles_only': False
+          }
+          
+          # Extension configuration
+          autodoc_default_options = {
+              'members': True,
+              'undoc-members': True,
+              'show-inheritance': True,
+              'special-members': '__init__',
+          }
+          
+          napoleon_google_docstring = True
+          napoleon_numpy_docstring = True
+          napoleon_include_init_with_doc = False
+          napoleon_include_private_with_doc = False
+          
+          EOF
+
       - name: Generate API documentation
         run: |
           cd docs
-          sphinx-apidoc -o . ../src --force
-          echo ".. include:: ../README.md" > index.rst
+          sphinx-apidoc -o . ../src --force --module-first
+          
+          # Create a better index.rst
+          cat > index.rst << 'EOF'
+          MICAP Documentation
+          ==================
+          
+          Market Intelligence & Competitor Analysis Platform
+          
+          .. toctree::
+             :maxdepth: 2
+             :caption: Contents:
+          
+             modules
+          
+          Indices and tables
+          ==================
+          
+          * :ref:`genindex`
+          * :ref:`modindex`
+          * :ref:`search`
+          EOF
 
       - name: Build HTML documentation
         run: |
@@ -83,18 +168,6 @@ jobs:
         with:
           name: documentation
           path: docs/_build/html/
-
-      - name: Create gh-pages branch (if not exists)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git fetch origin gh-pages || (
-            echo "gh-pages branch does not exist, creating it..."
-            git checkout --orphan gh-pages
-            git reset --hard
-            git commit --allow-empty -m "Initialize gh-pages branch"
-            git push origin gh-pages
-            git checkout main
-          )
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
