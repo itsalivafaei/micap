@@ -1,0 +1,36 @@
+/* Custom styling for MICAP documentation */
+
+.wy-nav-content {
+    max-width: 1200px;
+}
+
+.rst-content .section > img {
+    margin-bottom: 24px;
+}
+
+.rst-content .admonition-title {
+    font-weight: bold;
+}
+
+/* Code block styling */
+.rst-content .highlight {
+    margin: 1px 0 24px 0;
+}
+
+/* Table styling */
+.rst-content table.docutils {
+    border: 1px solid #e1e4e5;
+}
+
+.rst-content table.docutils td {
+    border: 1px solid #e1e4e5;
+    padding: 12px;
+}
+
+/* API documentation styling */
+.rst-content dl:not(.docutils) dt {
+    background: #f8f9fa;
+    border-left: 3px solid #2980b9;
+    padding: 6px;
+    margin-bottom: 6px;
+}
