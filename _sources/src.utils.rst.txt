@@ -1,6 +1,11 @@
 src.utils package
 =================
 
+.. automodule:: src.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Submodules
 ----------
 
@@ -16,14 +21,6 @@ src.utils.path\_utils module
 ----------------------------
 
 .. automodule:: src.utils.path_utils
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-Module contents
----------------
-
-.. automodule:: src.utils
    :members:
    :show-inheritance:
    :undoc-members:

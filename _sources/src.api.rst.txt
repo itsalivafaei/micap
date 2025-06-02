@@ -1,0 +1,18 @@
+src.api package
+===============
+
+.. automodule:: src.api
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+src.api.main module
+-------------------
+
+.. automodule:: src.api.main
+   :members:
+   :show-inheritance:
+   :undoc-members:

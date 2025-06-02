@@ -1,6 +1,11 @@
 src.ml package
 ==============
 
+.. automodule:: src.ml
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Submodules
 ----------
 
@@ -32,14 +37,6 @@ src.ml.trend\_detection module
 ------------------------------
 
 .. automodule:: src.ml.trend_detection
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-Module contents
----------------
-
-.. automodule:: src.ml
    :members:
    :show-inheritance:
    :undoc-members:

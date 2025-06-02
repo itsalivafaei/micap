@@ -1,6 +1,11 @@
 src.spark package
 =================
 
+.. automodule:: src.spark
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Submodules
 ----------
 
@@ -48,14 +53,6 @@ src.spark.topic\_analysis module
 --------------------------------
 
 .. automodule:: src.spark.topic_analysis
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-Module contents
----------------
-
-.. automodule:: src.spark
    :members:
    :show-inheritance:
    :undoc-members:
