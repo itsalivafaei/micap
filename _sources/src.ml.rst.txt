@@ -1,0 +1,45 @@
+src.ml package
+==============
+
+Submodules
+----------
+
+src.ml.deep\_learning\_models module
+------------------------------------
+
+.. automodule:: src.ml.deep_learning_models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+src.ml.entity\_recognition module
+---------------------------------
+
+.. automodule:: src.ml.entity_recognition
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+src.ml.sentiment\_models module
+-------------------------------
+
+.. automodule:: src.ml.sentiment_models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+src.ml.trend\_detection module
+------------------------------
+
+.. automodule:: src.ml.trend_detection
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: src.ml
+   :members:
+   :show-inheritance:
+   :undoc-members:
